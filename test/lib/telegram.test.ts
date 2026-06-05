@@ -22,7 +22,7 @@ describe("Telegram messages", () => {
 		const chunks = splitTelegramText(text);
 
 		expect(chunks).toHaveLength(2);
-		expect(chunks.every((chunk) => chunk.length <= 3900)).toBe(true);
+		expect(chunks.every((chunk) => chunk.length <= 3000)).toBe(true);
 		expect(chunks.join("\n\n")).toBe(text);
 	});
 
@@ -89,5 +89,26 @@ describe("Telegram messages", () => {
 		const secondBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
 		expect(secondBody.text).toContain("<b>Second chunk</b>");
 		expect(secondBody.parse_mode).toBe("HTML");
+	});
+
+	it("keeps formatted long chunks below Telegram message limits", async () => {
+		const fetchMock = vi
+			.spyOn(globalThis, "fetch")
+			.mockResolvedValue(new Response(JSON.stringify({ ok: true })));
+
+		await sendLongTelegramMessage(
+			{ TELEGRAM_BOT_TOKEN: "token" },
+			{
+				chatId: "123",
+				text: `${"A&B ".repeat(700)}\n\n**Second chunk** ${"C<D> ".repeat(700)}`,
+			},
+		);
+
+		expect(fetchMock.mock.calls.length).toBeGreaterThan(1);
+		for (const call of fetchMock.mock.calls) {
+			const body = JSON.parse(String(call[1]?.body));
+			expect(body.text.length).toBeLessThanOrEqual(4096);
+			expect(body.parse_mode).toBe("HTML");
+		}
 	});
 });

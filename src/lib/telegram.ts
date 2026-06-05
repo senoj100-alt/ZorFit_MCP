@@ -41,22 +41,33 @@ export async function sendTelegramMessage(
 	if (!env.TELEGRAM_BOT_TOKEN) {
 		throw new Error("TELEGRAM_BOT_TOKEN is not configured.");
 	}
-	const endpoint = `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`;
 	const shouldFormat = message.parseMode !== null;
+	await postTelegramMessage(
+		env,
+		message,
+		shouldFormat ? formatTelegramHtmlFromMarkdown(message.text) : message.text,
+		shouldFormat ? message.text : undefined,
+	);
+}
+
+async function postTelegramMessage(
+	env: TelegramEnv,
+	message: TelegramMessage,
+	text: string,
+	fallbackText?: string,
+): Promise<void> {
+	const endpoint = `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`;
 	const response = await fetch(endpoint, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
-		body: telegramPayload(
-			message,
-			shouldFormat ? formatTelegramHtmlFromMarkdown(message.text) : message.text,
-		),
+		body: telegramPayload(message, text),
 	});
 	if (!response.ok) {
-		if (shouldFormat) {
+		if (message.parseMode !== null && fallbackText !== undefined) {
 			const fallback = await fetch(endpoint, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: telegramPayload({ ...message, parseMode: null }, message.text),
+				body: telegramPayload({ ...message, parseMode: null }, fallbackText),
 			});
 			if (fallback.ok) return;
 		}
@@ -68,7 +79,7 @@ export async function sendTelegramMessage(
 
 export function splitTelegramText(
 	text: string,
-	maximumLength = 3900,
+	maximumLength = 3000,
 ): string[] {
 	const remainingParagraphs = text.split(/\n{2,}/);
 	const chunks: string[] = [];
@@ -101,13 +112,25 @@ export async function sendLongTelegramMessage(
 	env: TelegramEnv,
 	message: TelegramMessage,
 ): Promise<void> {
-	const chunks = splitTelegramText(message.text);
+	if (!env.TELEGRAM_BOT_TOKEN) {
+		throw new Error("TELEGRAM_BOT_TOKEN is not configured.");
+	}
+	const shouldFormat = message.parseMode !== null;
+	const preparedText = shouldFormat
+		? formatTelegramHtmlFromMarkdown(message.text)
+		: message.text;
+	const chunks = splitTelegramText(preparedText);
 	for (const chunk of chunks) {
-		await sendTelegramMessage(env, {
-			chatId: message.chatId,
-			text: chunk,
-			parseMode: message.parseMode,
-		});
+		await postTelegramMessage(
+			env,
+			{
+				chatId: message.chatId,
+				text: chunk,
+				parseMode: message.parseMode,
+			},
+			chunk,
+			shouldFormat ? chunk : undefined,
+		);
 	}
 }
 

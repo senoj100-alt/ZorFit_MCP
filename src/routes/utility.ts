@@ -40,7 +40,10 @@ import {
 } from "../lib/data-routing.js";
 import { sendTestNutritionInsight } from "../lib/scheduled-nutrition.js";
 import { getZorFitServiceStatuses } from "../lib/service-registry.js";
-import { sendTelegramMessage } from "../lib/telegram.js";
+import {
+	sendLongTelegramMessage,
+	sendTelegramMessage,
+} from "../lib/telegram.js";
 import {
 	generateBasicHealthInsight,
 	generateHealthInsight,
@@ -1926,7 +1929,7 @@ utilityRoutes.post("/api/telegram/test-message-insight", async (c) => {
 		const answer = aiConnection
 			? await generateHealthInsight(aiConnection, input)
 			: generateBasicHealthInsight(input);
-		await sendTelegramMessage(c.env, {
+		await sendLongTelegramMessage(c.env, {
 			chatId: telegram.externalUserId,
 			text: `${input.title}\n\n${answer}\n\nNot medical advice. Consult a qualified professional for health or nutrition decisions.`,
 		});
