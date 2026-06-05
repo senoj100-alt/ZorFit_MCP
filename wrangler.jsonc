@@ -1,0 +1,66 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "zorfit",
+	"main": "src/index.ts",
+	"compatibility_date": "2025-03-10",
+	"compatibility_flags": ["nodejs_compat"],
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": ["ZorFitMCP"]
+		}
+	],
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "MCP_OBJECT",
+				"class_name": "ZorFitMCP"
+			}
+		]
+	},
+	"kv_namespaces": [
+		{
+			"binding": "OAUTH_KV",
+			"id": "REPLACE_WITH_YOUR_PRODUCTION_KV_NAMESPACE_ID"
+		}
+	],
+	"d1_databases": [
+		{
+			"binding": "ZORFIT_DB",
+			"database_name": "zorfit_mcp",
+			"database_id": "REPLACE_WITH_YOUR_PRODUCTION_D1_DATABASE_ID"
+		}
+	],
+	"observability": {
+		"enabled": true
+	},
+	"triggers": {
+		"crons": ["*/15 * * * *"]
+	},
+	"env": {
+		"dev": {
+			"name": "zorfit-dev",
+			"durable_objects": {
+				"bindings": [
+					{
+						"name": "MCP_OBJECT",
+						"class_name": "ZorFitMCP"
+					}
+				]
+			},
+			"kv_namespaces": [
+				{
+					"binding": "OAUTH_KV",
+					"id": "REPLACE_WITH_YOUR_DEV_KV_NAMESPACE_ID"
+				}
+			],
+			"d1_databases": [
+				{
+					"binding": "ZORFIT_DB",
+					"database_name": "zorfit_mcp_dev",
+					"database_id": "REPLACE_WITH_YOUR_DEV_D1_DATABASE_ID"
+				}
+			]
+		}
+	}
+}

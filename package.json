@@ -1,0 +1,64 @@
+{
+	"name": "zorfit",
+	"version": "1.0.0",
+	"description": "A production-ready Model Context Protocol server that unifies wearable, workout, nutrition, and training data across ZorFit integrations.",
+	"keywords": [
+		"mcp",
+		"model-context-protocol",
+		"hevy",
+		"strava",
+		"cronometer",
+		"intervals-icu",
+		"fitbit",
+		"google-fit",
+		"google-fit-api",
+		"fitness",
+		"health",
+		"wearables",
+		"cloudflare-workers",
+		"ai",
+		"claude",
+		"remote-mcp"
+	],
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/senoj100-alt/ZorFit_MCP.git"
+	},
+	"bugs": {
+		"url": "https://github.com/senoj100-alt/ZorFit_MCP/issues"
+	},
+	"homepage": "https://github.com/senoj100-alt/ZorFit_MCP#readme",
+	"scripts": {
+		"check": "npm run type-check && npm run test:run",
+		"deploy": "wrangler deploy",
+		"dev": "wrangler dev --env dev --port 8787",
+		"format": "biome format --write",
+		"lint": "biome lint",
+		"lint:fix": "biome lint --fix",
+		"start": "wrangler dev --env dev --port 8787",
+		"cf-typegen": "wrangler types",
+		"type-check": "tsc --noEmit",
+		"test": "vitest",
+		"test:watch": "vitest --watch",
+		"test:ui": "vitest --ui",
+		"test:coverage": "vitest --coverage",
+		"test:run": "vitest run"
+	},
+	"dependencies": {
+		"@cloudflare/workers-oauth-provider": "^0.0.11",
+		"@modelcontextprotocol/sdk": "^1.29.0",
+		"agents": "^0.13.3",
+		"hono": "^4.10.1",
+		"octokit": "^5.0.4",
+		"zod": "^4.4.3"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.2.5",
+		"@cloudflare/workers-types": "^4.20251011.0",
+		"@types/node": "^24.7.2",
+		"@vitest/ui": "^4.1.8",
+		"typescript": "5.9.3",
+		"vitest": "^4.1.8",
+		"wrangler": "^4.45.0"
+	}
+}

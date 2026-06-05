@@ -1,0 +1,59 @@
+# ZorFit_MCP local development configuration
+# Copy this file to `.dev.vars` when running locally.
+# Never commit `.dev.vars`, `.env`, tokens, passwords, or real API keys.
+
+# Required for the GitHub sign-in flow.
+# Create a GitHub OAuth App at https://github.com/settings/developers.
+GITHUB_CLIENT_ID=replace_with_your_github_oauth_client_id
+GITHUB_CLIENT_SECRET=replace_with_your_github_oauth_client_secret
+
+# Optional for Google sign-in.
+# Create a Google OAuth web client and add:
+# http://localhost:8787/auth/google/callback
+# https://your-worker-domain.example/auth/google/callback
+GOOGLE_LOGIN_CLIENT_ID=replace_with_google_login_oauth_client_id
+GOOGLE_LOGIN_CLIENT_SECRET=replace_with_google_login_oauth_client_secret
+
+# Required for encrypting user credentials before they are stored in Cloudflare KV.
+# Generate one with: openssl rand -hex 32
+COOKIE_ENCRYPTION_KEY=replace_with_64_character_hex_string
+
+# Optional single-owner service credentials.
+# Leave any service blank if you do not use it.
+
+# Hevy
+# Get this from Hevy developer settings.
+HEVY_API_KEY=replace_with_hevy_api_key
+
+# Strava
+# Create an app at https://www.strava.com/settings/api.
+STRAVA_CLIENT_ID=replace_with_strava_client_id
+STRAVA_CLIENT_SECRET=replace_with_strava_client_secret
+STRAVA_ACCESS_TOKEN=replace_with_strava_access_token
+STRAVA_REFRESH_TOKEN=replace_with_strava_refresh_token
+
+# Cronometer
+# ZorFit_MCP uses placeholders here. Do not commit real account passwords.
+CRONOMETER_USERNAME=replace_with_cronometer_email
+CRONOMETER_PASSWORD=replace_with_cronometer_password
+
+# Intervals.icu
+# The athlete ID is usually your Intervals.icu account athlete identifier.
+INTERVALS_ICU_API_KEY=replace_with_intervals_icu_api_key
+INTERVALS_ICU_ATHLETE_ID=replace_with_intervals_icu_athlete_id
+
+# Fitbit OAuth app credentials.
+# Users connect their own Fitbit accounts from /connections.
+FITBIT_CLIENT_ID=replace_with_fitbit_client_id
+FITBIT_CLIENT_SECRET=replace_with_fitbit_client_secret
+
+# Google Fit OAuth app credentials.
+# Users connect their own Google accounts from /connections.
+GOOGLE_FIT_CLIENT_ID=replace_with_google_fit_client_id
+GOOGLE_FIT_CLIENT_SECRET=replace_with_google_fit_client_secret
+
+# Telegram nutrition pushes.
+# Create a bot with BotFather, then use the username without the @ symbol.
+TELEGRAM_BOT_TOKEN=replace_with_telegram_bot_token_from_botfather
+TELEGRAM_BOT_USERNAME=replace_with_telegram_bot_username_without_at
+TELEGRAM_WEBHOOK_SECRET=replace_with_optional_random_webhook_secret

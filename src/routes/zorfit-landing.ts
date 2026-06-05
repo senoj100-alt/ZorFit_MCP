@@ -1,0 +1,1356 @@
+export function renderZorFitLandingPage(origin = "https://zorfit.YOUR_SUBDOMAIN.workers.dev"): string {
+	const normalizedOrigin = origin.replace(/\/$/, "");
+	return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ZorFit - Ask your training data anything</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --black: #0a0a0a;
+      --panel: #121212;
+      --panel-2: #181818;
+      --line: #2c2c2c;
+      --white: #f5f2ec;
+      --muted: #aaa49a;
+      --muted-2: #6f6a62;
+      --lime: #c8f542;
+      --lime-2: #e5ff82;
+      --orange: #ff5c1a;
+      --danger: #ff784d;
+      --shadow: rgba(0, 0, 0, 0.4);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--black);
+      color: var(--white);
+      font-family: "DM Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .page {
+      min-height: 100vh;
+      overflow: hidden;
+      background:
+        linear-gradient(90deg, rgba(245, 242, 236, 0.04) 1px, transparent 1px) 0 0 / 84px 84px,
+        linear-gradient(180deg, rgba(245, 242, 236, 0.035) 1px, transparent 1px) 0 0 / 84px 84px,
+        var(--black);
+    }
+
+    .shell {
+      width: min(1180px, calc(100% - 40px));
+      margin: 0 auto;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 22px 0;
+      border-bottom: 1px solid rgba(245, 242, 236, 0.12);
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .mark {
+      width: 36px;
+      height: 40px;
+      flex: 0 0 auto;
+      display: block;
+    }
+
+    .wordmark {
+      font-family: "Bebas Neue", Impact, sans-serif;
+      font-size: 32px;
+      line-height: 0.9;
+      letter-spacing: 3px;
+    }
+
+    .nav {
+      display: flex;
+      align-items: center;
+      gap: 26px;
+      color: var(--muted);
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    .nav a:hover {
+      color: var(--white);
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn {
+      min-height: 42px;
+      border: 1px solid rgba(245, 242, 236, 0.16);
+      border-radius: 8px;
+      padding: 0 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: rgba(245, 242, 236, 0.04);
+      color: var(--white);
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .btn.primary {
+      background: var(--lime);
+      border-color: var(--lime);
+      color: var(--black);
+      box-shadow: 0 14px 34px rgba(200, 245, 66, 0.18);
+    }
+
+    .btn.ghost {
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .hero {
+      min-height: calc(100vh - 87px);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(380px, 0.82fr);
+      align-items: center;
+      gap: 56px;
+      padding: 54px 0 46px;
+      position: relative;
+    }
+
+    .hero:before {
+      content: "ZOR";
+      position: absolute;
+      right: -70px;
+      top: 26px;
+      z-index: 0;
+      color: rgba(245, 242, 236, 0.035);
+      font-family: "Bebas Neue", Impact, sans-serif;
+      font-size: clamp(220px, 33vw, 470px);
+      line-height: 0.78;
+      letter-spacing: 2px;
+      pointer-events: none;
+    }
+
+    .hero-copy,
+    .hero-product {
+      position: relative;
+      z-index: 1;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--lime);
+      font-family: "Space Mono", monospace;
+      font-size: 12px;
+      letter-spacing: 1.6px;
+      text-transform: uppercase;
+      margin-bottom: 22px;
+    }
+
+    .pulse {
+      width: 8px;
+      height: 8px;
+      background: var(--lime);
+      border-radius: 99px;
+      box-shadow: 0 0 0 6px rgba(200, 245, 66, 0.12);
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 780px;
+      font-family: "Bebas Neue", Impact, sans-serif;
+      font-size: clamp(82px, 12vw, 156px);
+      line-height: 0.82;
+      letter-spacing: 0;
+      text-wrap: balance;
+    }
+
+    .hero p {
+      max-width: 620px;
+      margin: 28px 0 0;
+      color: var(--muted);
+      font-size: clamp(18px, 2vw, 22px);
+      line-height: 1.45;
+    }
+
+    .hero-cta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 34px;
+    }
+
+    .status-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 36px;
+      max-width: 660px;
+    }
+
+    .metric {
+      min-height: 92px;
+      padding: 16px;
+      border: 1px solid rgba(245, 242, 236, 0.12);
+      background: rgba(18, 18, 18, 0.86);
+      border-radius: 8px;
+    }
+
+    .metric strong {
+      display: block;
+      color: var(--white);
+      font-family: "Space Mono", monospace;
+      font-size: 22px;
+      line-height: 1;
+    }
+
+    .metric span {
+      display: block;
+      margin-top: 10px;
+      color: var(--muted-2);
+      font-size: 13px;
+      line-height: 1.25;
+    }
+
+    .product-card {
+      border: 1px solid rgba(245, 242, 236, 0.16);
+      background: linear-gradient(180deg, rgba(245, 242, 236, 0.08), rgba(245, 242, 236, 0.03));
+      border-radius: 8px;
+      box-shadow: 0 30px 80px var(--shadow);
+      overflow: hidden;
+    }
+
+    .product-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px;
+      border-bottom: 1px solid rgba(245, 242, 236, 0.1);
+      background: rgba(0, 0, 0, 0.24);
+    }
+
+    .product-title {
+      font-family: "Space Mono", monospace;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.8px;
+    }
+
+    .secure {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--lime);
+      font-family: "Space Mono", monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+    }
+
+    .product-body {
+      padding: 18px;
+    }
+
+    .chat {
+      display: grid;
+      gap: 12px;
+    }
+
+    .bubble {
+      border-radius: 8px;
+      padding: 15px;
+      line-height: 1.4;
+      border: 1px solid rgba(245, 242, 236, 0.1);
+      background: rgba(10, 10, 10, 0.7);
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .bubble.user {
+      color: var(--white);
+      border-color: rgba(200, 245, 66, 0.32);
+      background: rgba(200, 245, 66, 0.08);
+    }
+
+    .answer {
+      display: grid;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .answer-row {
+      display: grid;
+      grid-template-columns: 28px 1fr auto;
+      align-items: center;
+      gap: 10px;
+      padding: 12px;
+      border-radius: 8px;
+      background: rgba(245, 242, 236, 0.05);
+      border: 1px solid rgba(245, 242, 236, 0.08);
+    }
+
+    .icon {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border-radius: 6px;
+      background: var(--lime);
+      color: var(--black);
+      font-weight: 900;
+      font-family: "Space Mono", monospace;
+      font-size: 13px;
+    }
+
+    .icon.warn {
+      background: var(--orange);
+    }
+
+    .answer-row b {
+      display: block;
+      font-size: 14px;
+      color: var(--white);
+    }
+
+    .answer-row small {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted-2);
+    }
+
+    .chip {
+      border-radius: 6px;
+      padding: 6px 8px;
+      background: rgba(200, 245, 66, 0.1);
+      color: var(--lime);
+      font-family: "Space Mono", monospace;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .source-band {
+      border-top: 1px solid rgba(245, 242, 236, 0.12);
+      border-bottom: 1px solid rgba(245, 242, 236, 0.12);
+      background: rgba(10, 10, 10, 0.7);
+    }
+
+    .source-grid {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 1px;
+      background: rgba(245, 242, 236, 0.1);
+    }
+
+    .source {
+      min-height: 92px;
+      padding: 18px;
+      background: var(--black);
+    }
+
+    .source b {
+      display: block;
+      font-size: 15px;
+    }
+
+    .source span {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+      color: var(--muted-2);
+      font-family: "Space Mono", monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+    }
+
+    .source.connected span {
+      color: var(--lime);
+    }
+
+    .source.needs span {
+      color: var(--orange);
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: currentColor;
+    }
+
+    .section {
+      padding: 84px 0;
+    }
+
+    .steps-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 32px;
+    }
+
+    .step-card,
+    .recipe-card,
+    .price-card,
+    .start-panel {
+      border: 1px solid rgba(245, 242, 236, 0.12);
+      background: var(--panel);
+      border-radius: 8px;
+    }
+
+    .step-card {
+      min-height: 268px;
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .step-number {
+      display: inline-flex;
+      width: max-content;
+      border-radius: 6px;
+      padding: 6px 8px;
+      background: rgba(200, 245, 66, 0.1);
+      color: var(--lime);
+      font-family: "Space Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .step-card h3,
+    .recipe-card h3,
+    .price-card h3 {
+      margin: 18px 0 0;
+      font-family: "Bebas Neue", Impact, sans-serif;
+      font-size: 42px;
+      line-height: 0.94;
+      letter-spacing: 0;
+    }
+
+    .step-card p,
+    .recipe-card p,
+    .price-card p,
+    .start-panel p {
+      margin: 14px 0 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .endpoint {
+      display: block;
+      margin-top: 18px;
+      padding: 12px;
+      border: 1px solid rgba(200, 245, 66, 0.24);
+      border-radius: 8px;
+      background: rgba(200, 245, 66, 0.07);
+      color: var(--lime);
+      font-family: "Space Mono", monospace;
+      font-size: 12px;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+
+    .connector-status {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 28px;
+    }
+
+    .connector-mini {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid rgba(245, 242, 236, 0.12);
+      border-radius: 8px;
+      background: rgba(245, 242, 236, 0.04);
+    }
+
+    .connector-mini b {
+      display: block;
+      font-size: 15px;
+    }
+
+    .connector-mini span {
+      color: var(--lime);
+      font-family: "Space Mono", monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .recipes-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 32px;
+    }
+
+    .recipe-card {
+      min-height: 124px;
+      padding: 22px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .recipe-index {
+      width: 34px;
+      height: 34px;
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      border-radius: 6px;
+      background: var(--lime);
+      color: var(--black);
+      font-family: "Space Mono", monospace;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .recipe-card p {
+      margin: 0;
+      color: var(--white);
+      font-size: 17px;
+    }
+
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 32px;
+    }
+
+    .price-card {
+      min-height: 430px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .price-card.highlight {
+      background: var(--lime);
+      color: var(--black);
+      border-color: var(--lime);
+    }
+
+    .price {
+      margin-top: 16px;
+      font-family: "Bebas Neue", Impact, sans-serif;
+      font-size: 88px;
+      line-height: 0.85;
+    }
+
+    .price-note {
+      margin-top: 10px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .price-card.highlight .price-note,
+    .price-card.highlight p {
+      color: rgba(10, 10, 10, 0.72);
+    }
+
+    .strike {
+      color: rgba(10, 10, 10, 0.42);
+      text-decoration: line-through;
+      font-size: 42px;
+      margin-left: 8px;
+      vertical-align: baseline;
+    }
+
+    .feature-list {
+      display: grid;
+      gap: 12px;
+      margin-top: 24px;
+      padding: 0;
+      list-style: none;
+    }
+
+    .feature-list li {
+      display: grid;
+      grid-template-columns: 18px 1fr;
+      gap: 10px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    .price-card.highlight .feature-list li {
+      color: rgba(10, 10, 10, 0.78);
+    }
+
+    .feature-list li:before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      margin-top: 6px;
+      border-radius: 999px;
+      background: var(--lime);
+    }
+
+    .price-card.highlight .feature-list li:before {
+      background: var(--black);
+    }
+
+    .start-panel {
+      padding: 34px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 28px;
+      align-items: center;
+      background:
+        linear-gradient(135deg, rgba(200, 245, 66, 0.16), rgba(255, 92, 26, 0.08)),
+        var(--panel);
+    }
+
+    .start-panel h2 {
+      max-width: 720px;
+    }
+
+    .start-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    .section-head {
+      display: grid;
+      grid-template-columns: minmax(0, 0.82fr) minmax(320px, 0.58fr);
+      gap: 48px;
+      align-items: end;
+      margin-bottom: 30px;
+    }
+
+    .label {
+      margin-bottom: 14px;
+      color: var(--lime);
+      font-family: "Space Mono", monospace;
+      font-size: 12px;
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+    }
+
+    h2 {
+      margin: 0;
+      font-family: "Bebas Neue", Impact, sans-serif;
+      font-size: clamp(48px, 7vw, 92px);
+      line-height: 0.9;
+      letter-spacing: 0;
+    }
+
+    .section-head p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 17px;
+    }
+
+    .settings-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .settings-card {
+      min-height: 316px;
+      border: 1px solid rgba(245, 242, 236, 0.12);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .settings-card.featured {
+      background: var(--lime);
+      color: var(--black);
+      border-color: var(--lime);
+    }
+
+    .settings-card.warning {
+      border-color: rgba(255, 92, 26, 0.55);
+      background: linear-gradient(180deg, rgba(255, 92, 26, 0.16), rgba(18, 18, 18, 0.92));
+    }
+
+    .settings-card h3 {
+      margin: 0;
+      font-family: "Bebas Neue", Impact, sans-serif;
+      font-size: 42px;
+      line-height: 0.95;
+      letter-spacing: 0;
+    }
+
+    .settings-card p {
+      margin: 14px 0 0;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .settings-card.featured p {
+      color: rgba(10, 10, 10, 0.72);
+    }
+
+    .stack {
+      display: grid;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .mini-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 0;
+      border-top: 1px solid rgba(245, 242, 236, 0.1);
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .settings-card.featured .mini-row {
+      border-color: rgba(10, 10, 10, 0.14);
+      color: rgba(10, 10, 10, 0.74);
+    }
+
+    .pill {
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-family: "Space Mono", monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      background: rgba(245, 242, 236, 0.08);
+      color: var(--lime);
+      white-space: nowrap;
+    }
+
+    .settings-card.featured .pill {
+      background: rgba(10, 10, 10, 0.12);
+      color: var(--black);
+    }
+
+    .pill.orange {
+      color: var(--orange);
+      background: rgba(255, 92, 26, 0.1);
+    }
+
+    .coach {
+      display: grid;
+      grid-template-columns: minmax(0, 0.88fr) minmax(340px, 0.62fr);
+      gap: 14px;
+      align-items: stretch;
+    }
+
+    .briefing {
+      border: 1px solid rgba(245, 242, 236, 0.12);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 24px;
+      min-height: 410px;
+    }
+
+    .briefing-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: start;
+      border-bottom: 1px solid rgba(245, 242, 236, 0.1);
+      padding-bottom: 20px;
+      margin-bottom: 20px;
+    }
+
+    .briefing h3 {
+      margin: 0;
+      font-family: "Bebas Neue", Impact, sans-serif;
+      font-size: 54px;
+      line-height: 0.9;
+    }
+
+    .briefing p {
+      margin: 10px 0 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .score {
+      min-width: 108px;
+      min-height: 108px;
+      border: 8px solid var(--lime);
+      border-right-color: rgba(245, 242, 236, 0.16);
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      color: var(--lime);
+      font-family: "Space Mono", monospace;
+      font-size: 26px;
+      font-weight: 700;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 12px;
+    }
+
+    .timeline-item {
+      display: grid;
+      grid-template-columns: 80px 1fr;
+      gap: 16px;
+      padding: 14px;
+      background: rgba(245, 242, 236, 0.05);
+      border: 1px solid rgba(245, 242, 236, 0.08);
+      border-radius: 8px;
+    }
+
+    .time {
+      color: var(--lime);
+      font-family: "Space Mono", monospace;
+      font-size: 12px;
+    }
+
+    .timeline-item b {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .timeline-item span {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.35;
+    }
+
+    .message-card {
+      border-radius: 8px;
+      border: 1px solid rgba(245, 242, 236, 0.12);
+      background: var(--panel-2);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .message-card h3 {
+      margin: 0;
+      font-family: "Bebas Neue", Impact, sans-serif;
+      font-size: 46px;
+      line-height: 0.92;
+    }
+
+    .message-card p {
+      color: var(--muted);
+      line-height: 1.5;
+      margin: 14px 0 0;
+    }
+
+    .phone {
+      margin-top: 28px;
+      border: 1px solid rgba(245, 242, 236, 0.12);
+      border-radius: 8px;
+      padding: 14px;
+      background: var(--black);
+    }
+
+    .phone-message {
+      border-left: 3px solid var(--orange);
+      padding: 12px 14px;
+      color: var(--white);
+      line-height: 1.4;
+      background: rgba(255, 92, 26, 0.08);
+      font-size: 14px;
+    }
+
+    .footer {
+      border-top: 1px solid rgba(245, 242, 236, 0.12);
+      padding: 34px 0 44px;
+      color: var(--muted-2);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .footer strong {
+      color: var(--white);
+    }
+
+    @media (max-width: 980px) {
+      .nav {
+        display: none;
+      }
+
+      .hero {
+        grid-template-columns: 1fr;
+        min-height: auto;
+        padding-top: 42px;
+      }
+
+      .hero:before {
+        right: -40px;
+        top: 20px;
+        font-size: 220px;
+      }
+
+      .section-head,
+      .coach {
+        grid-template-columns: 1fr;
+      }
+
+      .source-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .steps-grid,
+      .pricing-grid,
+      .recipes-grid,
+      .start-panel {
+        grid-template-columns: 1fr;
+      }
+
+      .start-actions {
+        justify-content: flex-start;
+      }
+
+      .settings-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .shell {
+        width: min(100% - 28px, 1180px);
+      }
+
+      .topbar {
+        align-items: flex-start;
+      }
+
+      .actions {
+        display: none;
+      }
+
+      .wordmark {
+        font-size: 28px;
+      }
+
+      h1 {
+        font-size: clamp(68px, 24vw, 96px);
+      }
+
+      .status-row {
+        grid-template-columns: 1fr;
+      }
+
+      .source-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .connector-status {
+        grid-template-columns: 1fr;
+      }
+
+      .section {
+        padding: 62px 0;
+      }
+
+      .briefing-top {
+        display: grid;
+      }
+
+      .timeline-item {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="shell topbar">
+      <a class="brand" href="#top" aria-label="ZorFit home">
+        <svg class="mark" viewBox="0 0 64 72" fill="none" aria-hidden="true">
+          <polygon points="8,6 52,6 20,36 54,36 12,68 36,40 16,40 48,8" fill="#C8F542"></polygon>
+          <circle cx="54" cy="36" r="4.5" fill="#FF5C1A"></circle>
+        </svg>
+        <span class="wordmark">ZORFIT</span>
+      </a>
+      <nav class="nav" aria-label="Main navigation">
+        <a href="#how">How it works</a>
+        <a href="#sources">Sources</a>
+        <a href="#settings">Settings</a>
+        <a href="#recipes">Recipes</a>
+        <a href="#pricing">Pricing</a>
+      </nav>
+      <div class="actions">
+        <a class="btn ghost" href="/connections">Sign in</a>
+        <a class="btn primary" href="/settings">Open app</a>
+      </div>
+    </header>
+
+    <section id="top" class="shell hero">
+      <div class="hero-copy">
+        <div class="eyebrow"><span class="pulse"></span> Private fitness MCP</div>
+        <h1>Ask your training data anything.</h1>
+        <p>ZorFit connects workouts, nutrition, recovery signals, AI models, and message alerts into one private MCP endpoint for your health data.</p>
+        <div class="hero-cta">
+          <a class="btn primary" href="/connections">Connect sources</a>
+          <a class="btn" href="#how">Add to Claude</a>
+          <a class="btn ghost" href="/settings">View settings</a>
+        </div>
+        <div class="status-row" aria-label="Connection summary">
+          <div class="metric">
+            <strong>Live</strong>
+            <span>fitness data integrations</span>
+          </div>
+          <div class="metric">
+            <strong>BYOK</strong>
+            <span>bring your own AI key</span>
+          </div>
+          <div class="metric">
+            <strong>MCP</strong>
+            <span>agent-ready health endpoint</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-product" aria-label="ZorFit AI preview">
+        <div class="product-card">
+          <div class="product-top">
+            <span class="product-title">zorfit://coach/session</span>
+            <span class="secure"><span class="dot"></span> encrypted</span>
+          </div>
+          <div class="product-body">
+            <div class="chat">
+              <div class="bubble user">Why did my recovery drop this week?</div>
+              <div class="bubble">
+                Recovery is down mainly from sleep debt, lower HRV, and two high-intensity days with protein below target.
+                <div class="answer">
+                  <div class="answer-row">
+                    <span class="icon">1</span>
+                    <div>
+                      <b>Sleep pressure increased</b>
+                      <small>Two nights were 75 minutes below baseline.</small>
+                    </div>
+                    <span class="chip">-12%</span>
+                  </div>
+                  <div class="answer-row">
+                    <span class="icon warn">2</span>
+                    <div>
+                      <b>Nutrition gap detected</b>
+                      <small>Protein was below target on 3 of 7 days.</small>
+                    </div>
+                    <span class="chip">low</span>
+                  </div>
+                  <div class="answer-row">
+                    <span class="icon">3</span>
+                    <div>
+                      <b>Today’s recommendation</b>
+                      <small>Zone 2 or strength technique. Avoid another hard interval block.</small>
+                    </div>
+                    <span class="chip">moderate</span>
+                  </div>
+                </div>
+              </div>
+              <div class="bubble user">Send my nutrition check at 3:00 PM on Telegram.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="how" class="shell section">
+      <div class="section-head">
+        <div>
+          <div class="label">How it works</div>
+          <h2>Three steps. Then ask anything.</h2>
+        </div>
+        <p>No new dashboard habit. ZorFit_MCP lives behind the AI tools you already use, and serves your real numbers only when your agent asks.</p>
+      </div>
+
+      <div class="steps-grid">
+        <article class="step-card">
+          <div>
+            <span class="step-number">Step 01</span>
+            <h3>Sign in and connect sources.</h3>
+            <p>Use the connections dashboard to add supported activity, nutrition, recovery, and wearable data sources.</p>
+          </div>
+        </article>
+
+        <article class="step-card">
+          <div>
+            <span class="step-number">Step 02</span>
+            <h3>Paste your MCP URL.</h3>
+            <p>Connect Claude, ChatGPT, or any MCP-speaking agent to the live ZorFit MCP endpoint.</p>
+            <code class="endpoint">%ZORFIT_ORIGIN%/mcp</code>
+          </div>
+        </article>
+
+        <article class="step-card">
+          <div>
+            <span class="step-number">Step 03</span>
+            <h3>Ask useful questions.</h3>
+            <p>Your assistant can compare training load, workout history, nutrition, sleep, heart rate, and recovery patterns.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="sources" class="shell section">
+      <div class="section-head">
+        <div>
+          <div class="label">Sources</div>
+          <h2>Bring your fitness stack.</h2>
+        </div>
+        <p>Start with the connectors already wired into ZorFit_MCP. Add more services later without changing your MCP client setup.</p>
+      </div>
+      <div class="source-band">
+        <div class="source-grid">
+          <div class="source connected">
+            <b>Strava</b>
+            <span><i class="dot"></i> live</span>
+          </div>
+          <div class="source connected">
+            <b>Cronometer</b>
+            <span><i class="dot"></i> live</span>
+          </div>
+          <div class="source needs">
+            <b>Hevy</b>
+            <span><i class="dot"></i> coming soon</span>
+          </div>
+          <div class="source connected">
+            <b>Intervals.icu</b>
+            <span><i class="dot"></i> live</span>
+          </div>
+          <div class="source needs">
+            <b>Fitbit</b>
+            <span><i class="dot"></i> coming soon</span>
+          </div>
+          <div class="source needs">
+            <b>Google Fit</b>
+            <span><i class="dot"></i> coming soon</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="settings" class="shell section">
+      <div class="section-head">
+        <div>
+          <div class="label">Settings</div>
+          <h2>Connect data, AI, and messages from one place.</h2>
+        </div>
+        <p>The app keeps the same three-part structure you planned: fitness and wearables, AI model keys, and messaging services. The visual system gets sharper without changing the backend model.</p>
+      </div>
+
+      <div class="settings-grid">
+        <article class="settings-card featured">
+          <div>
+            <h3>Fitness Sources</h3>
+            <p>Add supported fitness, nutrition, recovery, and wearable connections using secure provider-specific setup.</p>
+          </div>
+          <div class="stack">
+            <div class="mini-row"><span>Activity platforms</span><span class="pill">live</span></div>
+            <div class="mini-row"><span>Nutrition logs</span><span class="pill">live</span></div>
+            <div class="mini-row"><span>Wearables</span><span class="pill">soon</span></div>
+          </div>
+        </article>
+
+        <article class="settings-card">
+          <div>
+            <h3>AI Connections</h3>
+            <p>Bring your own model keys for OpenAI, Claude, Gemini, Groq, NVIDIA NIM, OpenRouter, or Google AI Studio.</p>
+          </div>
+          <div class="stack">
+            <div class="mini-row"><span>Default provider</span><span class="pill">selectable</span></div>
+            <div class="mini-row"><span>Insight instructions</span><span class="pill">custom</span></div>
+            <div class="mini-row"><span>Structured output</span><span class="pill">ready</span></div>
+          </div>
+        </article>
+
+        <article class="settings-card warning">
+          <div>
+            <h3>Messages</h3>
+            <p>Configure Telegram nutrition pushes and daily briefing windows with timezone-aware delivery.</p>
+          </div>
+          <div class="stack">
+            <div class="mini-row"><span>Telegram</span><span class="pill orange">coming soon</span></div>
+            <div class="mini-row"><span>Push windows</span><span class="pill">configurable</span></div>
+            <div class="mini-row"><span>Disclaimer</span><span class="pill">included</span></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="recipes" class="shell section">
+      <div class="section-head">
+        <div>
+          <div class="label">Recipes</div>
+          <h2>Questions worth asking.</h2>
+        </div>
+        <p>These are the kinds of prompts ZorFit_MCP is designed to answer once your sources are connected.</p>
+      </div>
+
+      <div class="recipes-grid">
+        <article class="recipe-card"><span class="recipe-index">01</span><p>Why did my HR spike on easy runs this week?</p></article>
+        <article class="recipe-card"><span class="recipe-index">02</span><p>Which lifts have plateaued over the last 8 weeks?</p></article>
+        <article class="recipe-card"><span class="recipe-index">03</span><p>Compare my training load to sleep quality this month.</p></article>
+        <article class="recipe-card"><span class="recipe-index">04</span><p>What changed before my best workout days?</p></article>
+        <article class="recipe-card"><span class="recipe-index">05</span><p>Summarize my nutrition and workout consistency.</p></article>
+        <article class="recipe-card"><span class="recipe-index">06</span><p>Am I recovering well enough to increase volume?</p></article>
+      </div>
+    </section>
+
+    <section id="coach" class="shell section">
+      <div class="section-head">
+        <div>
+          <div class="label">AI coach preview</div>
+          <h2>Insights that say what to do next.</h2>
+        </div>
+        <p>ZorFit should feel more like a strict, useful coach than a passive dashboard: praise completed activity, call out nutrition misses, and explain what changed.</p>
+      </div>
+
+      <div class="coach">
+        <article class="briefing">
+          <div class="briefing-top">
+            <div>
+              <h3>Daily Briefing</h3>
+              <p>Recovery is stable, but your nutrition target is behind. Keep the next meal high-protein and moderate carb.</p>
+            </div>
+            <div class="score">76</div>
+          </div>
+          <div class="timeline">
+            <div class="timeline-item">
+              <span class="time">06:00</span>
+              <span><b>Previous day insight</b>Sleep was solid, but protein finished 38g under target.</span>
+            </div>
+            <div class="timeline-item">
+              <span class="time">10:00</span>
+              <span><b>Morning nutrition check</b>Breakfast was low in fiber. Add fruit or oats before lunch.</span>
+            </div>
+            <div class="timeline-item">
+              <span class="time">15:00</span>
+              <span><b>Midday course correction</b>Sugar is climbing. Make dinner lean protein plus vegetables.</span>
+            </div>
+            <div class="timeline-item">
+              <span class="time">22:00</span>
+              <span><b>Coach closeout</b>Workout completed. Good. Now stop pretending sleep is optional.</span>
+            </div>
+          </div>
+        </article>
+
+        <aside class="message-card">
+          <div>
+            <h3>Telegram Push</h3>
+            <p>Users choose their own windows, timezone, AI provider, and prompt instructions.</p>
+          </div>
+          <div class="phone">
+            <div class="phone-message">
+              Protein is behind target and sugar is high for this time of day. Next meal: chicken, lentils, Greek yogurt, or tofu. Skip the extra sweet snack unless you want tomorrow's recovery score to complain too.
+              <br><br>
+              Not medical advice. Consult a qualified professional for health or nutrition decisions.
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="pricing" class="shell section">
+      <div class="section-head">
+        <div>
+          <div class="label">Beta access</div>
+          <h2>Free while the private beta is small.</h2>
+        </div>
+        <p>This deployment is set up for a controlled beta. Keep usage modest, connect your own sources, and test the MCP workflow before turning it into a paid product.</p>
+      </div>
+
+      <div class="pricing-grid">
+        <article class="price-card">
+          <div>
+            <h3>Private beta</h3>
+            <div class="price">$0</div>
+            <p class="price-note">For your account and a small set of invited testers.</p>
+          </div>
+          <ul class="feature-list">
+            <li>Google or GitHub sign-in</li>
+            <li>Per-user encrypted credentials</li>
+            <li>One MCP endpoint</li>
+          </ul>
+        </article>
+
+        <article class="price-card highlight">
+          <div>
+            <h3>Product-ready path</h3>
+            <div class="price">$0 <span class="strike">$19/year</span></div>
+            <p class="price-note">Free for now while the beta stays small. Add Stripe, custom domain, provider review, rate limits, cache, and a polished account dashboard when you are ready to sell.</p>
+          </div>
+          <ul class="feature-list">
+            <li>Subscription checks before MCP access</li>
+            <li>Usage limits and audit logs</li>
+            <li>Public OAuth review readiness</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="shell section">
+      <div class="start-panel">
+        <div>
+          <div class="label">Start here</div>
+          <h2>Connect your sources.</h2>
+          <p>Sign in with Google or GitHub, add credentials, then point your MCP client at the live ZorFit endpoint.</p>
+        </div>
+        <div class="start-actions">
+          <a class="btn primary" href="/connections">Sign up with GitHub</a>
+          <a class="btn" href="/settings">Open settings</a>
+          <a class="btn ghost" href="/signup">Google option</a>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div class="shell">
+        <strong>Experimental.</strong> ZorFit demonstrates AI-powered fitness integrations and MCP workflows. It is not medical, nutritional, or professional training advice. Use at your own risk.
+      </div>
+    </footer>
+  </main>
+</body>
+</html>
+`.replaceAll("%ZORFIT_ORIGIN%", normalizedOrigin);
+}
