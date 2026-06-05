@@ -12,6 +12,16 @@ export interface NutritionInsightInput {
 	promptInstructions?: string;
 }
 
+export interface HealthInsightInput {
+	date: string;
+	timezone: string;
+	title?: string;
+	question: string;
+	categories: string[];
+	context: unknown;
+	promptInstructions?: string;
+}
+
 const DEFAULT_BASE_URLS: Record<AiProviderId, string> = {
 	openai: "https://api.openai.com/v1",
 	claude: "https://api.anthropic.com",
@@ -323,6 +333,29 @@ function nutritionPrompt(
 	].join("\n");
 }
 
+function healthPrompt(input: HealthInsightInput, maximumContextLength = 50000): string {
+	const contextJson = JSON.stringify(input.context);
+	return [
+		"You are ZorFit, a careful AI health and training insight assistant.",
+		"Use only the supplied ZorFit context. Do not invent missing workouts, nutrients, sleep, HRV, steps, or recovery values.",
+		"Explain what the data suggests, what is uncertain, and what the user can practically do next.",
+		"Do not diagnose, prescribe, or present medical advice. Do not recommend unsafe restriction, extreme dieting, or medication/supplement changes.",
+		"Use clear headings and short paragraphs or bullets. If Telegram formatting is later applied, markdown headings and bold text are acceptable.",
+		input.promptInstructions
+			? `User style/focus preferences:\n${input.promptInstructions.slice(0, 1000)}`
+			: "User style/focus preferences: none provided.",
+		`Title: ${input.title ?? "ZorFit insight"}.`,
+		`Date: ${input.date}.`,
+		`Timezone: ${input.timezone}.`,
+		`Selected categories: ${input.categories.join(", ")}.`,
+		`User question: ${input.question}.`,
+		"ZorFit context JSON:",
+		contextJson.length > maximumContextLength
+			? `${contextJson.slice(0, maximumContextLength)}\n\nContext was trimmed to fit the provider request limit.`
+			: contextJson,
+	].join("\n");
+}
+
 function openAiRequestSettings(connection: AiConnection): AiRequestSettings {
 	const recommended = recommendedAiRequestSettings(
 		connection.provider,
@@ -490,6 +523,46 @@ async function callOpenAiCompatible(
 	return text;
 }
 
+async function callOpenAiCompatibleHealth(
+	connection: AiConnection,
+	input: HealthInsightInput,
+): Promise<string> {
+	const baseUrl = trimSlash(
+		connection.baseUrl || DEFAULT_BASE_URLS[connection.provider],
+	);
+	const requestSettings = openAiRequestSettings(connection);
+	const response = await fetch(`${baseUrl}/chat/completions`, {
+		method: "POST",
+		headers: {
+			Authorization: `Bearer ${connection.apiKey}`,
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({
+			...requestSettings,
+			model: connection.modelName,
+			messages: [
+				{
+					role: "system",
+					content:
+						"You produce safe, practical, non-medical health and training insights for consumer wellness software.",
+				},
+				{ role: "user", content: healthPrompt(input) },
+			],
+		}),
+	});
+	if (!response.ok) {
+		throw new Error(
+			`LLM request failed (${response.status}): ${(await response.text()).slice(0, 500)}`,
+		);
+	}
+	const data = (await response.json()) as {
+		choices?: Array<{ message?: { content?: unknown } }>;
+	};
+	const text = textFromOpenAiContent(data.choices?.[0]?.message?.content);
+	if (!text) throw new Error("LLM response did not include final text.");
+	return text;
+}
+
 async function callAnthropic(
 	connection: AiConnection,
 	input: NutritionInsightInput,
@@ -509,6 +582,42 @@ async function callAnthropic(
 			temperature: settings.temperature ?? 0.4,
 			...(settings.top_p === undefined ? {} : { top_p: settings.top_p }),
 			messages: [{ role: "user", content: nutritionPrompt(input) }],
+		}),
+	});
+	if (!response.ok) {
+		throw new Error(
+			`Anthropic request failed (${response.status}): ${(await response.text()).slice(0, 500)}`,
+		);
+	}
+	const data = (await response.json()) as {
+		content?: Array<{ type?: string; text?: string }>;
+	};
+	const text = data.content
+		?.find((part) => part.type === "text" && part.text)
+		?.text?.trim();
+	if (!text) throw new Error("Anthropic response did not include text.");
+	return text;
+}
+
+async function callAnthropicHealth(
+	connection: AiConnection,
+	input: HealthInsightInput,
+): Promise<string> {
+	const baseUrl = trimSlash(connection.baseUrl || DEFAULT_BASE_URLS.claude);
+	const settings = connection.requestSettings;
+	const response = await fetch(`${baseUrl}/v1/messages`, {
+		method: "POST",
+		headers: {
+			"x-api-key": connection.apiKey,
+			"anthropic-version": "2023-06-01",
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({
+			model: connection.modelName,
+			max_tokens: settings.max_tokens ?? settings.max_completion_tokens ?? 2000,
+			temperature: settings.temperature ?? 0.4,
+			...(settings.top_p === undefined ? {} : { top_p: settings.top_p }),
+			messages: [{ role: "user", content: healthPrompt(input) }],
 		}),
 	});
 	if (!response.ok) {
@@ -562,6 +671,42 @@ async function callGemini(
 	return text;
 }
 
+async function callGeminiHealth(
+	connection: AiConnection,
+	input: HealthInsightInput,
+): Promise<string> {
+	const baseUrl = trimSlash(connection.baseUrl || DEFAULT_BASE_URLS.gemini);
+	const settings = connection.requestSettings;
+	const response = await fetch(
+		`${baseUrl}/models/${encodeURIComponent(connection.modelName)}:generateContent?key=${encodeURIComponent(connection.apiKey)}`,
+		{
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				contents: [{ parts: [{ text: healthPrompt(input) }] }],
+				generationConfig: {
+					temperature: settings.temperature ?? 0.4,
+					maxOutputTokens:
+						settings.max_tokens ?? settings.max_completion_tokens ?? 2000,
+					...(settings.top_p === undefined ? {} : { topP: settings.top_p }),
+					...(settings.seed === undefined ? {} : { seed: settings.seed }),
+				},
+			}),
+		},
+	);
+	if (!response.ok) {
+		throw new Error(
+			`Gemini request failed (${response.status}): ${(await response.text()).slice(0, 500)}`,
+		);
+	}
+	const data = (await response.json()) as {
+		candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+	};
+	const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+	if (!text) throw new Error("Gemini response did not include text.");
+	return text;
+}
+
 export async function generateNutritionInsight(
 	connection: AiConnection,
 	input: NutritionInsightInput,
@@ -577,6 +722,21 @@ export async function generateNutritionInsight(
 	return callOpenAiCompatible(connection, input);
 }
 
+export async function generateHealthInsight(
+	connection: AiConnection,
+	input: HealthInsightInput,
+): Promise<string> {
+	if (!connection.enabled) throw new Error("AI connection is disabled.");
+	if (connection.provider === "claude") return callAnthropicHealth(connection, input);
+	if (
+		connection.provider === "gemini" ||
+		connection.provider === "google_ai_studio"
+	) {
+		return callGeminiHealth(connection, input);
+	}
+	return callOpenAiCompatibleHealth(connection, input);
+}
+
 export function generateBasicNutritionInsight(
 	input: NutritionInsightInput,
 ): string {
@@ -585,5 +745,17 @@ export function generateBasicNutritionInsight(
 		`Nutrition check-in for ${label}: Cronometer data was available, but no AI provider is connected yet.`,
 		"Add an LLM API key in Settings -> AI Connections to receive personalized summaries.",
 		"Informational only, not medical or nutrition advice.",
+	].join("\n\n");
+}
+
+export function generateBasicHealthInsight(input: HealthInsightInput): string {
+	const categoryText = input.categories.length
+		? input.categories.join(", ")
+		: "selected categories";
+	return [
+		`ZorFit prepared context for ${categoryText}.`,
+		"Add an LLM API key in Settings -> AI Connections to receive a personalized answer.",
+		`Question: ${input.question}`,
+		"Informational only, not medical or professional training advice.",
 	].join("\n\n");
 }

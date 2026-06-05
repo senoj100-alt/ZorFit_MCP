@@ -13,20 +13,38 @@ import {
 } from "../lib/ai-connections.js";
 import {
 	consumeTelegramLinkCode,
+	MESSAGE_QUESTION_LIMIT,
 	PROMPT_INSTRUCTIONS_LIMIT,
 	createTelegramLinkCode,
+	deleteUserMessageSchedule,
 	getNotificationSchedule,
 	getTelegramConnection,
+	listUserMessageSchedules,
 	normalizeInsightMode,
+	normalizeMessageQuestion,
 	normalizeNotificationTimes,
 	normalizePromptInstructions,
 	normalizeTimezone,
+	upsertUserMessageSchedule,
 	upsertNotificationSchedule,
 	upsertTelegramConnection,
 } from "../lib/notifications.js";
+import {
+	HEALTH_CATEGORIES,
+	PROVIDER_LABELS,
+	collectHealthContext,
+	listDataPreferences,
+	normalizeHealthCategories,
+	questionBankForCategories,
+	upsertDataPreferences,
+} from "../lib/data-routing.js";
 import { sendTestNutritionInsight } from "../lib/scheduled-nutrition.js";
 import { getZorFitServiceStatuses } from "../lib/service-registry.js";
 import { sendTelegramMessage } from "../lib/telegram.js";
+import {
+	generateBasicHealthInsight,
+	generateHealthInsight,
+} from "../lib/llm-insights.js";
 import { ZORFIT_BRAND, ZORFIT_THEME_CSS } from "../lib/zorfit-theme.js";
 import type { Props } from "../utils.js";
 import { renderZorFitLandingPage } from "./zorfit-landing.js";
@@ -553,6 +571,83 @@ function settingsShell(title: string, body: string): string {
 		form .actions, .panel > .actions { margin-top: 18px; }
 		.section > .actions { margin: 0 0 14px; }
 		.time-row { align-items: end; margin-top: 10px; }
+		.checkbox-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+			gap: 10px;
+			margin-top: 10px;
+		}
+		.check-card {
+			display: flex;
+			align-items: flex-start;
+			gap: 10px;
+			min-height: 72px;
+			padding: 12px;
+			border: 1px solid rgba(245, 242, 236, 0.1);
+			border-radius: 8px;
+			background: rgba(245, 242, 236, 0.04);
+		}
+		.check-card input {
+			width: auto;
+			min-height: auto;
+			margin-top: 4px;
+		}
+		.check-card span {
+			display: block;
+			color: var(--text);
+			font-weight: 780;
+		}
+		.check-card small {
+			display: block;
+			margin-top: 3px;
+			color: var(--muted);
+			line-height: 1.35;
+		}
+		.schedule-card {
+			margin-top: 16px;
+			padding: 18px;
+		}
+		.schedule-head {
+			display: flex;
+			justify-content: space-between;
+			gap: 12px;
+			align-items: flex-start;
+			margin-bottom: 12px;
+		}
+		.question-bank {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 8px;
+			margin-top: 10px;
+		}
+		.question-bank button {
+			min-height: 34px;
+			padding: 7px 10px;
+			font-size: 0.78rem;
+		}
+		.chat-window {
+			display: grid;
+			gap: 12px;
+			min-height: 340px;
+			align-content: start;
+			padding: 16px;
+			border: 1px solid rgba(245, 242, 236, 0.1);
+			border-radius: 8px;
+			background: rgba(0, 0, 0, 0.22);
+		}
+		.chat-message {
+			max-width: 86%;
+			padding: 12px 14px;
+			border-radius: 8px;
+			background: rgba(245, 242, 236, 0.06);
+			color: var(--soft);
+			white-space: pre-wrap;
+			line-height: 1.55;
+		}
+		.chat-message.user {
+			justify-self: end;
+			background: rgba(180, 255, 44, 0.12);
+		}
 		#message { min-height: 24px; margin-top: 14px; color: var(--green); font-weight: 760; }
 		footer {
 			padding: 36px 0;
@@ -581,6 +676,7 @@ function settingsShell(title: string, body: string): string {
 			<div class="nav-links">
 				<a class="button" href="/settings">Settings</a>
 				<a class="button" href="/connections">Connections</a>
+				<a class="button" href="/coach">Coach chat</a>
 			</div>
 		</div>
 	</nav>
@@ -690,6 +786,35 @@ function timezoneOptions(selected: string): string {
 		.join("");
 }
 
+async function getPreferredAiConnectionForSession(env: Env, session: Props) {
+	const [summaries, preference] = await Promise.all([
+		listAiConnectionSummaries(env, session),
+		getAiPreference(env, session),
+	]);
+	const preferred = preference
+		? summaries.find(
+				(summary) =>
+					summary.provider === preference.defaultProvider && summary.enabled,
+			)
+		: undefined;
+	const fallback = summaries.find((summary) => summary.enabled) ?? summaries[0];
+	const selected = preferred ?? fallback;
+	if (!selected) return null;
+	return getAiConnection(env, session, selected.provider);
+}
+
+function localDateForTimezone(timezone: string, now = new Date()): string {
+	const parts = new Intl.DateTimeFormat("en-CA", {
+		timeZone: normalizeTimezone(timezone),
+		year: "numeric",
+		month: "2-digit",
+		day: "2-digit",
+	}).formatToParts(now);
+	const get = (type: string) =>
+		parts.find((part) => part.type === type)?.value ?? "";
+	return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
 const AI_PROVIDER_DEFAULTS: Record<
 	AiProviderId,
 	{ baseUrl: string; model: string; help: string }
@@ -740,6 +865,14 @@ utilityRoutes.get("/settings", (c) => {
 			description:
 				"Connect health apps, nutrition trackers, training platforms, and wearable devices.",
 			href: "/settings/sources",
+		},
+		{
+			id: "routing",
+			label: "Data Routing",
+			status: "New",
+			description:
+				"Choose where ZorFit should read HRV, sleep, nutrition, steps, workouts, and recovery from.",
+			href: "/settings/data-routing",
 		},
 		{
 			id: "ai",
@@ -818,6 +951,87 @@ utilityRoutes.get("/settings/sources", async (c) => {
 		</section>
 	</main>`;
 	return c.html(settingsShell("Fitness Apps & Wearables", body));
+});
+
+utilityRoutes.get("/settings/data-routing", async (c) => {
+	const session = await getSettingsSession(c);
+	const preferences = session ? await listDataPreferences(c.env, session) : [];
+	const preferenceMap = new Map(preferences.map((item) => [item.category, item]));
+	const rows = HEALTH_CATEGORIES.map((category) => {
+		const preference = preferenceMap.get(category.id);
+		const options = category.providers
+			.map(
+				(provider) =>
+					`<option value="${provider}" ${provider === preference?.provider ? "selected" : ""}>${escapeHtml(PROVIDER_LABELS[provider])}</option>`,
+			)
+			.join("");
+		const fallbackOptions = [
+			`<option value="">No fallback</option>`,
+			...category.providers.map(
+				(provider) =>
+					`<option value="${provider}" ${provider === preference?.fallbackProvider ? "selected" : ""}>${escapeHtml(PROVIDER_LABELS[provider])}</option>`,
+			),
+		].join("");
+		return `<div class="panel routing-row" data-category="${category.id}">
+			<div class="row">
+				<div>
+					<label>${escapeHtml(category.label)}</label>
+					<p>${escapeHtml(category.description)}</p>
+				</div>
+				<div>
+					<label for="provider-${category.id}">Primary source</label>
+					<select id="provider-${category.id}" name="provider">${options}</select>
+					<label for="fallback-${category.id}">Fallback source</label>
+					<select id="fallback-${category.id}" name="fallbackProvider">${fallbackOptions}</select>
+					<label>
+						<input name="enabled" type="checkbox" ${preference?.enabled === false ? "" : "checked"} style="width:auto; min-height:auto; margin-right:8px;">
+						Use this category in ZorFit insights
+					</label>
+				</div>
+			</div>
+		</div>`;
+	}).join("");
+	const body = `<main class="shell">
+		<section class="hero">
+			<div>
+				<span class="eyebrow">Data routing</span>
+				<h1>Choose where each signal comes from.</h1>
+				<p class="lede">ZorFit uses these preferences when Telegram messages and Coach Chat need HRV, sleep, nutrition, steps, gym workouts, activities, or recovery data.</p>
+			</div>
+			<div class="panel">
+				<strong>${session ? `Signed in as @${escapeHtml(session.login)}` : "Sign in required"}</strong>
+				<p>${session ? "Selections are saved per user. Connect provider credentials first for live data." : "Sign in before saving data routing preferences."}</p>
+			</div>
+		</section>
+		<form id="routingForm">
+			<div class="actions"><a class="button" href="/settings">Back to settings</a></div>
+			${rows}
+			<div class="actions">
+				<button class="primary" type="submit" ${session ? "" : "disabled"}>Save data routing</button>
+				<a class="button" href="/settings/messages">Configure messages</a>
+			</div>
+			<div id="message"></div>
+		</form>
+	</main>
+	<script>
+		document.getElementById("routingForm")?.addEventListener("submit", async (event) => {
+			event.preventDefault();
+			const preferences = Array.from(document.querySelectorAll(".routing-row")).map((row) => ({
+				category: row.dataset.category,
+				provider: row.querySelector('select[name="provider"]').value,
+				fallbackProvider: row.querySelector('select[name="fallbackProvider"]').value || undefined,
+				enabled: row.querySelector('input[name="enabled"]').checked,
+			}));
+			const response = await fetch("/api/data-preferences", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ preferences }),
+			});
+			const data = await response.json().catch(() => ({}));
+			document.getElementById("message").textContent = response.ok ? "Saved data routing." : (data.error || "Could not save data routing.");
+		});
+	</script>`;
+	return c.html(settingsShell("Data Routing", body));
 });
 
 utilityRoutes.get("/settings/ai", async (c) => {
@@ -924,11 +1138,11 @@ utilityRoutes.get("/settings/messages", async (c) => {
 			<div>
 				<span class="eyebrow">Messages</span>
 				<h1>Send insights where users already are.</h1>
-				<p class="lede">Connect Telegram now as the first messaging channel placeholder, with WhatsApp and other channels possible later.</p>
+				<p class="lede">Connect Telegram, then create multiple scheduled messages. Each message can choose the data categories ZorFit should fetch before asking your selected AI model.</p>
 			</div>
 			<div class="panel">
 				<strong>${telegram?.enabled ? "Telegram connected" : "Telegram first"}</strong>
-				<p>${telegram?.enabled ? "Nutrition insight schedules can now send to Telegram." : "The setup flow uses a bot deep link and short-lived code. Users do not need to paste chat IDs."}</p>
+				<p>${telegram?.enabled ? "Scheduled insight messages can now send to Telegram." : "The setup flow uses a bot deep link and short-lived code. Users do not need to paste chat IDs."}</p>
 			</div>
 		</section>
 		<section class="section">
@@ -1119,6 +1333,254 @@ utilityRoutes.get("/settings/llm/:id", async (c) => {
 	return c.html(settingsShell(provider.label, body));
 });
 
+utilityRoutes.get("/settings/messaging/telegram", async (c) => {
+	const session = await getSettingsSession(c);
+	const telegram = session ? await getTelegramConnection(c.env, session) : null;
+	const schedules = session ? await listUserMessageSchedules(c.env, session) : [];
+	const telegramReady = Boolean(
+		c.env.TELEGRAM_BOT_TOKEN && c.env.TELEGRAM_BOT_USERNAME,
+	);
+	const telegramHelper = telegramReady
+		? `Click Connect Telegram to open @${escapeHtml(c.env.TELEGRAM_BOT_USERNAME ?? "your_bot")} and link your account with a secure one-time code.`
+		: "A Telegram bot token and bot username must be configured in Cloudflare before the deep link can be used in production.";
+	const initialSchedules = schedules.length
+		? schedules
+		: [
+				{
+					id: "",
+					title: "Morning recovery briefing",
+					enabled: false,
+					timezone: "America/New_York",
+					times: ["06:00"],
+					insightMode: "smart",
+					categories: ["hrv", "sleep", "fitness_activities"],
+					question:
+						"Should I train hard today based on recovery and recent activity?",
+					promptInstructions: "",
+				},
+			];
+	const categoryChecks = (selected: string[]) =>
+		HEALTH_CATEGORIES.map(
+			(category) => `<label class="check-card">
+				<input name="categories" type="checkbox" value="${category.id}" ${selected.includes(category.id) ? "checked" : ""}>
+				<span>${escapeHtml(category.label)}<small>${escapeHtml(category.description)}</small></span>
+			</label>`,
+		).join("");
+	const renderMessageCard = (schedule: (typeof initialSchedules)[number], index: number) => {
+		const times = schedule.times.length ? schedule.times : ["10:00"];
+		return `<form class="panel schedule-card" data-message-form data-id="${escapeHtml(schedule.id)}">
+			<div class="schedule-head">
+				<div>
+					<span class="status">${schedule.enabled ? "Enabled" : "Draft"}</span>
+					<h3>${escapeHtml(schedule.title || `Message ${index + 1}`)}</h3>
+				</div>
+				<button type="button" class="danger" data-delete-message ${schedule.id ? "" : "disabled"}>Delete</button>
+			</div>
+			<label>
+				<input name="enabled" type="checkbox" ${schedule.enabled ? "checked" : ""} style="width:auto; min-height:auto; margin-right:8px;">
+				Enable this scheduled message
+			</label>
+			<label>Message name</label>
+			<input name="title" value="${escapeHtml(schedule.title)}" placeholder="Morning recovery briefing">
+			<div class="row">
+				<div>
+					<label>Timezone</label>
+					<select name="timezone">${timezoneOptions(schedule.timezone)}</select>
+				</div>
+				<div>
+					<label>Insight mode</label>
+					<select name="insightMode">
+						<option value="smart" ${schedule.insightMode === "smart" ? "selected" : ""}>Smart</option>
+						<option value="today_so_far" ${schedule.insightMode === "today_so_far" ? "selected" : ""}>Today so far</option>
+						<option value="previous_day" ${schedule.insightMode === "previous_day" ? "selected" : ""}>Previous day</option>
+					</select>
+				</div>
+			</div>
+			<label>Insight times</label>
+			<div data-times>${times.map((time) => `<div class="row time-row"><input name="times" value="${escapeHtml(time)}" placeholder="HH:MM"><button type="button" data-remove-time>Remove</button></div>`).join("")}</div>
+			<div class="actions"><button type="button" data-add-time>Add time</button></div>
+			<label>Include data categories</label>
+			<div class="checkbox-grid" data-categories>${categoryChecks(schedule.categories)}</div>
+			<div class="helper">ZorFit uses your Data Routing settings to decide which provider supplies each selected category.</div>
+			<label>Question or instruction</label>
+			<textarea name="question" maxlength="${MESSAGE_QUESTION_LIMIT}" placeholder="Example: Should I train hard today based on recovery, sleep, and recent activity?">${escapeHtml(schedule.question ?? "")}</textarea>
+			<div class="question-bank" data-question-bank></div>
+			<div class="field-meta">
+				<label>Style instructions</label>
+				<span class="count" data-prompt-count>0/${PROMPT_INSTRUCTIONS_LIMIT}</span>
+			</div>
+			<textarea class="large-textarea" name="promptInstructions" maxlength="${PROMPT_INSTRUCTIONS_LIMIT}" placeholder="Example: Be direct but supportive. Include the not-medical-advice disclaimer.">${escapeHtml(schedule.promptInstructions ?? "")}</textarea>
+			<div class="actions">
+				<button class="primary" type="submit" ${session ? "" : "disabled"}>Save message</button>
+				<button type="button" data-test-message ${session ? "" : "disabled"}>Send test now</button>
+			</div>
+			<div data-message-status id="message"></div>
+		</form>`;
+	};
+	const blankCard = renderMessageCard(
+		{
+			id: "",
+			title: "New ZorFit insight",
+			enabled: false,
+			timezone: "America/New_York",
+			times: ["10:00"],
+			insightMode: "smart",
+			categories: ["nutrition"],
+			question: "Summarize what I should focus on next.",
+			promptInstructions: "",
+		},
+		99,
+	);
+	const body = `<main class="shell">
+		<section class="hero">
+			<div>
+				<span class="eyebrow">Messaging</span>
+				<h1>Telegram insight builder.</h1>
+				<p class="lede">Create multiple scheduled messages. Each message chooses the health data categories ZorFit should fetch before asking your selected AI model.</p>
+			</div>
+			<div class="panel">
+				<strong>${telegram?.enabled ? "Connected" : session ? "Ready to connect" : "Sign in required"}</strong>
+				<p>${telegram?.externalUsername ? `Linked to @${escapeHtml(telegram.externalUsername)}.` : "Users click Connect Telegram, open the ZorFit bot, and link with a short-lived code. No chat ID paste required."}</p>
+			</div>
+		</section>
+		<div class="panel">
+			<div class="actions">
+				<button class="primary" id="connectTelegram" type="button" ${session && telegramReady ? "" : "disabled"}>${telegram?.enabled ? "Reconnect Telegram" : "Connect Telegram"}</button>
+				<a class="button" href="/settings/messages">Back to messages</a>
+				<a class="button" href="/settings/data-routing">Data routing</a>
+			</div>
+			<div class="helper" id="telegramLinkMessage">${telegramHelper}</div>
+		</div>
+		<section class="section">
+			<div class="section-head">
+				<div>
+					<span class="eyebrow">Scheduled messages</span>
+					<h2>Build Telegram check-ins.</h2>
+				</div>
+				<button class="primary" type="button" id="addMessage">+ New message</button>
+			</div>
+			<div id="messageList">${initialSchedules.map(renderMessageCard).join("")}</div>
+		</section>
+	</main>
+	<script>
+		const promptLimit = ${PROMPT_INSTRUCTIONS_LIMIT};
+		const questionLimit = ${MESSAGE_QUESTION_LIMIT};
+		const blankCardHtml = ${JSON.stringify(blankCard)};
+		const linkMessage = document.getElementById("telegramLinkMessage");
+		document.getElementById("connectTelegram")?.addEventListener("click", async () => {
+			const response = await fetch("/api/telegram/link-code", { method: "POST" });
+			const data = await response.json().catch(() => ({}));
+			if (!response.ok) {
+				linkMessage.textContent = data.error || "Could not create Telegram link.";
+				return;
+			}
+			const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + encodeURIComponent(data.botUrl);
+			linkMessage.innerHTML =
+				'<div class="qr-link-panel">' +
+					'<div>' +
+						'<p><strong>Option 1: open on this device</strong></p>' +
+						'<a class="button primary" href="' + data.botUrl + '" target="_blank" rel="noreferrer">Open Telegram</a>' +
+						'<p style="margin-top:12px;"><strong>Option 2: scan from mobile</strong></p>' +
+						'<p>Open your phone camera or Telegram QR scanner, scan the code, then tap Start to link your account.</p>' +
+						'<p><a href="' + data.botUrl + '" target="_blank" rel="noreferrer">' + data.botUrl + '</a></p>' +
+					'</div>' +
+					'<img alt="Telegram link QR code" src="' + qrUrl + '">' +
+				'</div>';
+			window.open(data.botUrl, "_blank", "noopener,noreferrer");
+		});
+		function selectedCategories(form) {
+			return Array.from(form.querySelectorAll('input[name="categories"]:checked')).map((input) => input.value);
+		}
+		async function refreshQuestionBank(form) {
+			const bank = form.querySelector("[data-question-bank]");
+			const response = await fetch("/api/question-bank", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ categories: selectedCategories(form) }),
+			});
+			const data = await response.json().catch(() => ({ questions: [] }));
+			bank.innerHTML = (data.questions || []).map((question) => {
+				const safe = question.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+				return '<button type="button" data-question="' + safe + '">' + safe + '</button>';
+			}).join("");
+		}
+		function payloadForForm(form) {
+			return {
+				id: form.dataset.id || undefined,
+				title: form.elements.title.value.trim(),
+				enabled: form.elements.enabled.checked,
+				timezone: form.elements.timezone.value.trim(),
+				insightMode: form.elements.insightMode.value,
+				times: Array.from(form.querySelectorAll('input[name="times"]')).map((input) => input.value.trim()),
+				categories: selectedCategories(form),
+				question: form.elements.question.value.trim().slice(0, questionLimit),
+				promptInstructions: form.elements.promptInstructions.value.trim(),
+			};
+		}
+		function wireForm(form) {
+			const prompt = form.elements.promptInstructions;
+			const count = form.querySelector("[data-prompt-count]");
+			const updateCount = () => { count.textContent = prompt.value.length + "/" + promptLimit; };
+			prompt.addEventListener("input", updateCount);
+			updateCount();
+			form.querySelector("[data-add-time]")?.addEventListener("click", () => {
+				const row = document.createElement("div");
+				row.className = "row time-row";
+				row.innerHTML = '<input name="times" value="12:00" placeholder="HH:MM"><button type="button" data-remove-time>Remove</button>';
+				form.querySelector("[data-times]").appendChild(row);
+			});
+			form.addEventListener("click", async (event) => {
+				if (event.target.dataset?.removeTime !== undefined) event.target.closest(".time-row")?.remove();
+				if (event.target.dataset?.question) form.elements.question.value = event.target.dataset.question;
+				if (event.target.dataset?.deleteMessage !== undefined && form.dataset.id) {
+					const response = await fetch("/api/message-schedules/" + form.dataset.id, { method: "DELETE" });
+					if (response.ok) form.remove();
+				}
+				if (event.target.dataset?.testMessage !== undefined) {
+					const status = form.querySelector("[data-message-status]");
+					event.target.disabled = true;
+					status.textContent = "Generating and sending test message...";
+					const response = await fetch("/api/telegram/test-message-insight", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify(payloadForForm(form)),
+					});
+					const data = await response.json().catch(() => ({}));
+					status.textContent = response.ok ? "Test message sent to Telegram." : (data.error || "Could not send test message.");
+					event.target.disabled = false;
+				}
+			});
+			form.querySelector("[data-categories]")?.addEventListener("change", () => refreshQuestionBank(form));
+			form.addEventListener("submit", async (event) => {
+				event.preventDefault();
+				const status = form.querySelector("[data-message-status]");
+				const response = await fetch("/api/message-schedules", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify(payloadForForm(form)),
+				});
+				const data = await response.json().catch(() => ({}));
+				if (response.ok) {
+					form.dataset.id = data.id;
+					status.textContent = "Saved message schedule.";
+				} else {
+					status.textContent = data.error || "Could not save message schedule.";
+				}
+			});
+			refreshQuestionBank(form);
+		}
+		document.querySelectorAll("[data-message-form]").forEach(wireForm);
+		document.getElementById("addMessage")?.addEventListener("click", () => {
+			const wrapper = document.createElement("div");
+			wrapper.innerHTML = blankCardHtml;
+			const form = wrapper.firstElementChild;
+			document.getElementById("messageList").appendChild(form);
+			wireForm(form);
+		});
+	</script>`;
+	return c.html(settingsShell("Telegram", body));
+});
+
 utilityRoutes.get("/settings/messaging/:id", async (c) => {
 	const id = c.req.param("id");
 	const service = MESSAGING_SETTINGS.find((item) => item.id === id);
@@ -1259,6 +1721,261 @@ utilityRoutes.get("/settings/messaging/:id", async (c) => {
 		});
 	</script>`;
 	return c.html(settingsShell(service.label, body));
+});
+
+utilityRoutes.get("/coach", async (c) => {
+	const session = await getSettingsSession(c);
+	const categoryChecks = HEALTH_CATEGORIES.map(
+		(category) => `<label class="check-card">
+			<input name="categories" type="checkbox" value="${category.id}" ${["nutrition", "fitness_activities", "recovery"].includes(category.id) ? "checked" : ""}>
+			<span>${escapeHtml(category.label)}<small>${escapeHtml(category.description)}</small></span>
+		</label>`,
+	).join("");
+	const body = `<main class="shell">
+		<section class="hero">
+			<div>
+				<span class="eyebrow">Coach chat</span>
+				<h1>Ask your training data anything.</h1>
+				<p class="lede">Pick the health categories ZorFit should fetch, ask a question, and get an answer using your selected AI provider.</p>
+			</div>
+			<div class="panel">
+				<strong>${session ? `Signed in as @${escapeHtml(session.login)}` : "Sign in required"}</strong>
+				<p>${session ? "Coach Chat uses your Data Routing and AI Connection settings." : "Sign in before chatting with your ZorFit data."}</p>
+			</div>
+		</section>
+		<section class="section">
+			<div class="actions">
+				<a class="button" href="/settings/data-routing">Data routing</a>
+				<a class="button" href="/settings/ai">AI settings</a>
+				<a class="button" href="/settings/messages">Messages</a>
+			</div>
+			<div class="panel">
+				<label>Use these data categories</label>
+				<div class="checkbox-grid" id="coachCategories">${categoryChecks}</div>
+				<div class="question-bank" id="coachQuestionBank"></div>
+				<div class="chat-window" id="chatWindow">
+					<div class="chat-message">Select categories, choose a suggested question, or type your own.</div>
+				</div>
+				<form id="coachForm">
+					<label for="coachQuestion">Question</label>
+					<textarea id="coachQuestion" name="question" placeholder="Example: Why is recovery lower and what should I do today?"></textarea>
+					<div class="actions">
+						<button class="primary" type="submit" ${session ? "" : "disabled"}>Ask ZorFit</button>
+					</div>
+					<div id="message"></div>
+				</form>
+			</div>
+		</section>
+	</main>
+	<script>
+		const chatWindow = document.getElementById("chatWindow");
+		const form = document.getElementById("coachForm");
+		function selectedCategories() {
+			return Array.from(document.querySelectorAll('#coachCategories input[name="categories"]:checked')).map((input) => input.value);
+		}
+		function appendMessage(text, role) {
+			const div = document.createElement("div");
+			div.className = "chat-message " + (role || "");
+			div.textContent = text;
+			chatWindow.appendChild(div);
+			chatWindow.scrollTop = chatWindow.scrollHeight;
+		}
+		async function refreshBank() {
+			const response = await fetch("/api/question-bank", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ categories: selectedCategories() }),
+			});
+			const data = await response.json().catch(() => ({ questions: [] }));
+			document.getElementById("coachQuestionBank").innerHTML = (data.questions || []).map((question) => {
+				const safe = question.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+				return '<button type="button" data-question="' + safe + '">' + safe + '</button>';
+			}).join("");
+		}
+		document.getElementById("coachCategories").addEventListener("change", refreshBank);
+		document.getElementById("coachQuestionBank").addEventListener("click", (event) => {
+			if (event.target.dataset?.question) form.elements.question.value = event.target.dataset.question;
+		});
+		form?.addEventListener("submit", async (event) => {
+			event.preventDefault();
+			const question = form.elements.question.value.trim();
+			if (!question) return;
+			appendMessage(question, "user");
+			document.getElementById("message").textContent = "Fetching data and asking your AI model...";
+			const response = await fetch("/api/coach-chat", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ question, categories: selectedCategories() }),
+			});
+			const data = await response.json().catch(() => ({}));
+			appendMessage(response.ok ? data.answer : (data.error || "Could not answer."), "");
+			document.getElementById("message").textContent = "";
+		});
+		refreshBank();
+	</script>`;
+	return c.html(settingsShell("Coach Chat", body));
+});
+
+utilityRoutes.get("/api/data-preferences", async (c) => {
+	const session = await getSettingsSession(c);
+	if (!session) return c.json({ error: "Unauthorized" }, 401);
+	return c.json({
+		categories: HEALTH_CATEGORIES,
+		preferences: await listDataPreferences(c.env, session),
+	});
+});
+
+utilityRoutes.post("/api/data-preferences", async (c) => {
+	const session = await getSettingsSession(c);
+	if (!session) return c.json({ error: "Unauthorized" }, 401);
+	try {
+		const body = await c.req.json();
+		const preferences = Array.isArray(body.preferences) ? body.preferences : [];
+		await upsertDataPreferences(c.env, session, preferences);
+		return c.json({ success: true });
+	} catch (error) {
+		console.error("Data preference save failed:", error);
+		return c.json({ error: "Could not save data routing." }, 500);
+	}
+});
+
+utilityRoutes.post("/api/question-bank", async (c) => {
+	const body = await c.req.json().catch(() => ({}));
+	const categories = normalizeHealthCategories(body.categories);
+	return c.json({ categories, questions: questionBankForCategories(categories) });
+});
+
+utilityRoutes.get("/api/message-schedules", async (c) => {
+	const session = await getSettingsSession(c);
+	if (!session) return c.json({ error: "Unauthorized" }, 401);
+	return c.json({ schedules: await listUserMessageSchedules(c.env, session) });
+});
+
+utilityRoutes.post("/api/message-schedules", async (c) => {
+	const session = await getSettingsSession(c);
+	if (!session) return c.json({ error: "Unauthorized" }, 401);
+	try {
+		const body = await c.req.json();
+		const times = normalizeNotificationTimes(body.times);
+		if (times.length === 0)
+			return c.json(
+				{ error: "Add at least one valid time in HH:MM format." },
+				400,
+			);
+		const id = await upsertUserMessageSchedule(c.env, session, {
+			id: typeof body.id === "string" && body.id ? body.id : undefined,
+			title: typeof body.title === "string" ? body.title : "ZorFit insight",
+			enabled: Boolean(body.enabled),
+			timezone: normalizeTimezone(body.timezone),
+			times,
+			insightMode: normalizeInsightMode(body.insightMode),
+			categories: normalizeHealthCategories(body.categories),
+			question: normalizeMessageQuestion(body.question),
+			promptInstructions: normalizePromptInstructions(body.promptInstructions),
+		});
+		return c.json({ success: true, id });
+	} catch (error) {
+		console.error("Message schedule save failed:", error);
+		return c.json({ error: "Could not save message schedule." }, 500);
+	}
+});
+
+utilityRoutes.delete("/api/message-schedules/:id", async (c) => {
+	const session = await getSettingsSession(c);
+	if (!session) return c.json({ error: "Unauthorized" }, 401);
+	await deleteUserMessageSchedule(c.env, session, c.req.param("id"));
+	return c.json({ success: true });
+});
+
+utilityRoutes.post("/api/telegram/test-message-insight", async (c) => {
+	const session = await getSettingsSession(c);
+	if (!session) return c.json({ error: "Unauthorized" }, 401);
+	try {
+		const body = await c.req.json();
+		const telegram = await getTelegramConnection(c.env, session);
+		if (!telegram?.externalUserId || !telegram.enabled) {
+			return c.json(
+				{ error: "Telegram is not connected. Connect Telegram first." },
+				400,
+			);
+		}
+		const timezone = normalizeTimezone(body.timezone);
+		const date = localDateForTimezone(timezone);
+		const categories = normalizeHealthCategories(body.categories);
+		const question =
+			normalizeMessageQuestion(body.question) ||
+			"Give me a useful ZorFit insight from the selected health categories.";
+		const context = await collectHealthContext(c.env, session, {
+			categories,
+			timezone,
+			date,
+		});
+		const aiConnection = await getPreferredAiConnectionForSession(c.env, session);
+		const input = {
+			date,
+			timezone,
+			title:
+				typeof body.title === "string" && body.title.trim()
+					? body.title.trim()
+					: "ZorFit test insight",
+			question,
+			categories,
+			context,
+			promptInstructions: normalizePromptInstructions(body.promptInstructions),
+		};
+		const answer = aiConnection
+			? await generateHealthInsight(aiConnection, input)
+			: generateBasicHealthInsight(input);
+		await sendTelegramMessage(c.env, {
+			chatId: telegram.externalUserId,
+			text: `${input.title}\n\n${answer}\n\nNot medical advice. Consult a qualified professional for health or nutrition decisions.`,
+		});
+		return c.json({ success: true });
+	} catch (error) {
+		console.error("Test message insight failed:", error);
+		return c.json(
+			{ error: error instanceof Error ? error.message.slice(0, 500) : "Could not send test message." },
+			400,
+		);
+	}
+});
+
+utilityRoutes.post("/api/coach-chat", async (c) => {
+	const session = await getSettingsSession(c);
+	if (!session) return c.json({ error: "Unauthorized" }, 401);
+	try {
+		const body = await c.req.json();
+		const question = normalizeMessageQuestion(body.question);
+		if (!question) return c.json({ error: "Ask a question first." }, 400);
+		const timezone = normalizeTimezone(body.timezone);
+		const date = localDateForTimezone(timezone);
+		const categories = normalizeHealthCategories(body.categories);
+		const context = await collectHealthContext(c.env, session, {
+			categories,
+			timezone,
+			date,
+		});
+		const aiConnection = await getPreferredAiConnectionForSession(c.env, session);
+		const input = {
+			date,
+			timezone,
+			title: "ZorFit Coach Chat",
+			question,
+			categories,
+			context,
+			promptInstructions: normalizePromptInstructions(body.promptInstructions),
+		};
+		const answer = aiConnection
+			? await generateHealthInsight(aiConnection, input)
+			: generateBasicHealthInsight(input);
+		return c.json({ answer, context });
+	} catch (error) {
+		console.error("Coach chat failed:", error);
+		return c.json(
+			{ error: error instanceof Error ? error.message.slice(0, 500) : "Could not answer." },
+			400,
+		);
+	}
 });
 
 utilityRoutes.get("/api/ai-connections", async (c) => {

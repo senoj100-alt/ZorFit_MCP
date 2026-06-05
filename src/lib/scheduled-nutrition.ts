@@ -11,16 +11,25 @@ import {
 } from "./cronometer-client.js";
 import {
 	generateBasicNutritionInsight,
+	generateBasicHealthInsight,
+	generateHealthInsight,
 	generateNutritionInsight,
 } from "./llm-insights.js";
 import {
 	type DueNotificationSchedule,
+	type DueUserMessageSchedule,
 	getNotificationSchedule,
 	getTelegramConnection,
 	listDueNutritionSchedules,
+	listDueUserMessageSchedules,
 	logNotification,
+	markUserMessageSlotSent,
 	markNotificationSlotSent,
 } from "./notifications.js";
+import {
+	collectHealthContext,
+	normalizeHealthCategories,
+} from "./data-routing.js";
 import { getServiceConnection } from "./service-connections.js";
 import { sendLongTelegramMessage } from "./telegram.js";
 
@@ -28,7 +37,9 @@ const TELEGRAM_SAFETY_FOOTER =
 	"Not medical advice. Consult a qualified professional for health or nutrition decisions.";
 type InsightSession = Pick<Props, "login" | "name" | "email">;
 
-function sessionForDueSchedule(schedule: DueNotificationSchedule) {
+function sessionForDueSchedule(
+	schedule: Pick<DueNotificationSchedule, "login" | "name" | "email">,
+) {
 	return {
 		login: schedule.login,
 		name: schedule.name,
@@ -153,6 +164,62 @@ async function processDueSchedule(
 	});
 }
 
+async function processDueUserMessageSchedule(
+	env: Env,
+	schedule: DueUserMessageSchedule,
+): Promise<void> {
+	const session = sessionForDueSchedule(schedule);
+	const telegram = await getTelegramConnection(env, session);
+	if (!telegram?.externalUserId || !telegram.enabled) {
+		await logNotification(env, {
+			userId: schedule.userId,
+			channel: "telegram",
+			topic: "nutrition",
+			scheduledFor: schedule.slotKey,
+			status: "skipped",
+			errorMessage: "Telegram is not connected.",
+		});
+		await markUserMessageSlotSent(env, schedule.id, schedule.slotKey);
+		return;
+	}
+
+	const date = dateForInsight(schedule);
+	const categories = normalizeHealthCategories(schedule.categories);
+	const question =
+		schedule.question ||
+		"Give me a useful ZorFit insight from the selected health categories.";
+	const context = await collectHealthContext(env, session, {
+		categories,
+		timezone: schedule.timezone,
+		date,
+	});
+	const aiConnection = await getPreferredAiConnection(env, session);
+	const input = {
+		date,
+		timezone: schedule.timezone,
+		title: schedule.title,
+		question,
+		categories,
+		context,
+		promptInstructions: schedule.promptInstructions,
+	};
+	const insight = aiConnection
+		? await generateHealthInsight(aiConnection, input)
+		: generateBasicHealthInsight(input);
+	await sendLongTelegramMessage(env, {
+		chatId: telegram.externalUserId,
+		text: `${schedule.title}\n\n${insight}\n\n${TELEGRAM_SAFETY_FOOTER}`,
+	});
+	await markUserMessageSlotSent(env, schedule.id, schedule.slotKey);
+	await logNotification(env, {
+		userId: schedule.userId,
+		channel: "telegram",
+		topic: "nutrition",
+		scheduledFor: schedule.slotKey,
+		status: "sent",
+	});
+}
+
 function localDateAndTime(
 	timezone: string,
 	now = new Date(),
@@ -218,12 +285,31 @@ export async function processNutritionNotifications(
 	env: Env,
 	now = new Date(),
 ): Promise<{ processed: number; failed: number }> {
-	const due = await listDueNutritionSchedules(env, now);
+	const [due, dueMessages] = await Promise.all([
+		listDueNutritionSchedules(env, now),
+		listDueUserMessageSchedules(env, now),
+	]);
 	let processed = 0;
 	let failed = 0;
 	for (const schedule of due) {
 		try {
 			await processDueSchedule(env, schedule);
+			processed += 1;
+		} catch (error) {
+			failed += 1;
+			await logNotification(env, {
+				userId: schedule.userId,
+				channel: "telegram",
+				topic: "nutrition",
+				scheduledFor: schedule.slotKey,
+				status: "failed",
+				errorMessage: error instanceof Error ? error.message : String(error),
+			});
+		}
+	}
+	for (const schedule of dueMessages) {
+		try {
+			await processDueUserMessageSchedule(env, schedule);
 			processed += 1;
 		} catch (error) {
 			failed += 1;

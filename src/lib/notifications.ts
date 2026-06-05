@@ -3,8 +3,10 @@ import { ensureUser } from "./service-connections.js";
 
 export type MessagingChannel = "telegram";
 export type NotificationTopic = "nutrition";
+export type MessageChannel = "telegram";
 export type InsightMode = "today_so_far" | "previous_day" | "smart";
 export const PROMPT_INSTRUCTIONS_LIMIT = 1000;
+export const MESSAGE_QUESTION_LIMIT = 500;
 
 export interface NotificationEnv {
 	ZORFIT_DB: D1Database;
@@ -32,6 +34,31 @@ export interface NotificationSchedule {
 }
 
 export interface DueNotificationSchedule extends NotificationSchedule {
+	userId: string;
+	login: string;
+	name: string;
+	email: string;
+	dueTime: string;
+	localDate: string;
+	slotKey: string;
+}
+
+export interface UserMessageSchedule {
+	id: string;
+	channel: MessageChannel;
+	title: string;
+	enabled: boolean;
+	timezone: string;
+	times: string[];
+	insightMode: InsightMode;
+	categories: string[];
+	question?: string;
+	promptInstructions?: string;
+	lastSent: Record<string, string>;
+	updatedAt: string;
+}
+
+export interface DueUserMessageSchedule extends UserMessageSchedule {
 	userId: string;
 	login: string;
 	name: string;
@@ -79,6 +106,13 @@ export function normalizePromptInstructions(
 	const trimmed = value.trim();
 	if (!trimmed) return undefined;
 	return trimmed.slice(0, PROMPT_INSTRUCTIONS_LIMIT);
+}
+
+export function normalizeMessageQuestion(value: unknown): string | undefined {
+	if (typeof value !== "string") return undefined;
+	const trimmed = value.trim();
+	if (!trimmed) return undefined;
+	return trimmed.slice(0, MESSAGE_QUESTION_LIMIT);
 }
 
 export async function getTelegramConnection(
@@ -407,5 +441,221 @@ export async function logNotification(
 			args.status,
 			args.errorMessage ?? null,
 		)
+		.run();
+}
+
+function parseJsonArray(value: string | null | undefined): unknown[] {
+	try {
+		const parsed = JSON.parse(value || "[]");
+		return Array.isArray(parsed) ? parsed : [];
+	} catch {
+		return [];
+	}
+}
+
+export async function listUserMessageSchedules(
+	env: NotificationEnv,
+	session: Pick<Props, "login" | "name" | "email">,
+): Promise<UserMessageSchedule[]> {
+	const userId = await ensureUser(env, session);
+	const { results } = await env.ZORFIT_DB.prepare(
+		`SELECT id, channel, title, enabled, timezone, times_json, insight_mode, categories_json, question, prompt_instructions, last_sent_json, updated_at
+		 FROM user_message_schedules
+		 WHERE user_id = ?
+		 ORDER BY created_at ASC`,
+	)
+		.bind(userId)
+		.all<{
+			id: string;
+			channel: MessageChannel;
+			title: string;
+			enabled: number;
+			timezone: string;
+			times_json: string;
+			insight_mode: InsightMode;
+			categories_json: string;
+			question: string | null;
+			prompt_instructions: string | null;
+			last_sent_json: string;
+			updated_at: string;
+		}>();
+	return (results ?? []).map((row) => ({
+		id: row.id,
+		channel: row.channel,
+		title: row.title,
+		enabled: row.enabled === 1,
+		timezone: normalizeTimezone(row.timezone),
+		times: normalizeNotificationTimes(parseJsonArray(row.times_json)),
+		insightMode: normalizeInsightMode(row.insight_mode),
+		categories: parseJsonArray(row.categories_json).filter(
+			(item): item is string => typeof item === "string",
+		),
+		question: normalizeMessageQuestion(row.question),
+		promptInstructions: normalizePromptInstructions(row.prompt_instructions),
+		lastSent: JSON.parse(row.last_sent_json || "{}") as Record<string, string>,
+		updatedAt: row.updated_at,
+	}));
+}
+
+export async function upsertUserMessageSchedule(
+	env: NotificationEnv,
+	session: Pick<Props, "login" | "name" | "email">,
+	args: {
+		id?: string;
+		title: string;
+		enabled: boolean;
+		timezone: string;
+		times: string[];
+		insightMode: InsightMode;
+		categories: string[];
+		question?: string;
+		promptInstructions?: string;
+	},
+): Promise<string> {
+	const userId = await ensureUser(env, session);
+	const now = new Date().toISOString();
+	const id = args.id || crypto.randomUUID();
+	const title = args.title.trim().slice(0, 90) || "ZorFit insight";
+	await env.ZORFIT_DB.prepare(
+		`INSERT INTO user_message_schedules
+		   (id, user_id, channel, title, enabled, timezone, times_json, insight_mode, categories_json, question, prompt_instructions, last_sent_json, created_at, updated_at)
+		 VALUES (?, ?, 'telegram', ?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?)
+		 ON CONFLICT(id) DO UPDATE SET
+		   title = excluded.title,
+		   enabled = excluded.enabled,
+		   timezone = excluded.timezone,
+		   times_json = excluded.times_json,
+		   insight_mode = excluded.insight_mode,
+		   categories_json = excluded.categories_json,
+		   question = excluded.question,
+		   prompt_instructions = excluded.prompt_instructions,
+		   updated_at = excluded.updated_at`,
+	)
+		.bind(
+			id,
+			userId,
+			title,
+			args.enabled ? 1 : 0,
+			normalizeTimezone(args.timezone),
+			JSON.stringify(normalizeNotificationTimes(args.times)),
+			normalizeInsightMode(args.insightMode),
+			JSON.stringify(args.categories.length ? args.categories : ["nutrition"]),
+			normalizeMessageQuestion(args.question) ?? null,
+			normalizePromptInstructions(args.promptInstructions) ?? null,
+			now,
+			now,
+		)
+		.run();
+	return id;
+}
+
+export async function deleteUserMessageSchedule(
+	env: NotificationEnv,
+	session: Pick<Props, "login" | "name" | "email">,
+	id: string,
+): Promise<void> {
+	const userId = await ensureUser(env, session);
+	await env.ZORFIT_DB.prepare(
+		"DELETE FROM user_message_schedules WHERE user_id = ? AND id = ?",
+	)
+		.bind(userId, id)
+		.run();
+}
+
+export async function listDueUserMessageSchedules(
+	env: NotificationEnv,
+	now = new Date(),
+): Promise<DueUserMessageSchedule[]> {
+	const { results } = await env.ZORFIT_DB.prepare(
+		`SELECT
+		   s.id, s.user_id, u.github_login, u.display_name, u.email,
+		   s.channel, s.title, s.enabled, s.timezone, s.times_json, s.insight_mode, s.categories_json, s.question, s.prompt_instructions, s.last_sent_json, s.updated_at
+		 FROM user_message_schedules s
+		 JOIN users u ON u.id = s.user_id
+		 WHERE s.channel = 'telegram' AND s.enabled = 1`,
+	).all<{
+		id: string;
+		user_id: string;
+		github_login: string;
+		display_name: string | null;
+		email: string | null;
+		channel: MessageChannel;
+		title: string;
+		enabled: number;
+		timezone: string;
+		times_json: string;
+		insight_mode: InsightMode;
+		categories_json: string;
+		question: string | null;
+		prompt_instructions: string | null;
+		last_sent_json: string;
+		updated_at: string;
+	}>();
+
+	const due: DueUserMessageSchedule[] = [];
+	for (const row of results ?? []) {
+		const timezone = normalizeTimezone(row.timezone);
+		const parts = localParts(now, timezone);
+		const times = normalizeNotificationTimes(parseJsonArray(row.times_json));
+		const lastSent = JSON.parse(row.last_sent_json || "{}") as Record<
+			string,
+			string
+		>;
+		for (const time of times) {
+			if (!isWithinCronWindow(parts.time, time)) continue;
+			const slotKey = `${row.id}:${parts.date}:${time}`;
+			if (lastSent[slotKey]) continue;
+			due.push({
+				id: row.id,
+				userId: row.user_id,
+				login: row.github_login,
+				name: row.display_name ?? row.github_login,
+				email: row.email ?? "",
+				channel: row.channel,
+				title: row.title,
+				enabled: row.enabled === 1,
+				timezone,
+				times,
+				insightMode: normalizeInsightMode(row.insight_mode),
+				categories: parseJsonArray(row.categories_json).filter(
+					(item): item is string => typeof item === "string",
+				),
+				question: normalizeMessageQuestion(row.question),
+				promptInstructions: normalizePromptInstructions(
+					row.prompt_instructions,
+				),
+				lastSent,
+				updatedAt: row.updated_at,
+				dueTime: time,
+				localDate: parts.date,
+				slotKey,
+			});
+		}
+	}
+	return due;
+}
+
+export async function markUserMessageSlotSent(
+	env: NotificationEnv,
+	scheduleId: string,
+	slotKey: string,
+): Promise<void> {
+	const row = await env.ZORFIT_DB.prepare(
+		`SELECT last_sent_json
+		 FROM user_message_schedules
+		 WHERE id = ?`,
+	)
+		.bind(scheduleId)
+		.first<{ last_sent_json: string }>();
+	const lastSent = row?.last_sent_json
+		? (JSON.parse(row.last_sent_json) as Record<string, string>)
+		: {};
+	lastSent[slotKey] = new Date().toISOString();
+	await env.ZORFIT_DB.prepare(
+		`UPDATE user_message_schedules
+		 SET last_sent_json = ?, updated_at = ?
+		 WHERE id = ?`,
+	)
+		.bind(JSON.stringify(lastSent), new Date().toISOString(), scheduleId)
 		.run();
 }

@@ -8,6 +8,32 @@ export interface TelegramMessage {
 	parseMode?: "HTML" | null;
 }
 
+export function formatTelegramHtmlFromMarkdown(text: string): string {
+	const escaped = escapeTelegramHtml(text);
+	return escaped
+		.split("\n")
+		.map((line) => {
+			const heading = line.match(/^#{1,6}\s+(.+)$/);
+			const normalizedLine = heading ? `<b>${heading[1]}</b>` : line;
+			const bulletLine = normalizedLine.replace(/^(\s*)[-*]\s+/u, "$1• ");
+			return bulletLine
+				.replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>")
+				.replace(/__([^_\n]+)__/g, "<b>$1</b>");
+		})
+		.join("\n");
+}
+
+function telegramPayload(message: TelegramMessage, text: string): string {
+	return JSON.stringify({
+		chat_id: message.chatId,
+		text,
+		...(message.parseMode === null
+			? {}
+			: { parse_mode: message.parseMode ?? "HTML" }),
+		disable_web_page_preview: true,
+	});
+}
+
 export async function sendTelegramMessage(
 	env: TelegramEnv,
 	message: TelegramMessage,
@@ -15,22 +41,25 @@ export async function sendTelegramMessage(
 	if (!env.TELEGRAM_BOT_TOKEN) {
 		throw new Error("TELEGRAM_BOT_TOKEN is not configured.");
 	}
-	const response = await fetch(
-		`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,
-		{
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				chat_id: message.chatId,
-				text: message.text,
-				...(message.parseMode === null
-					? {}
-					: { parse_mode: message.parseMode ?? "HTML" }),
-				disable_web_page_preview: true,
-			}),
-		},
-	);
+	const endpoint = `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`;
+	const shouldFormat = message.parseMode !== null;
+	const response = await fetch(endpoint, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: telegramPayload(
+			message,
+			shouldFormat ? formatTelegramHtmlFromMarkdown(message.text) : message.text,
+		),
+	});
 	if (!response.ok) {
+		if (shouldFormat) {
+			const fallback = await fetch(endpoint, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: telegramPayload({ ...message, parseMode: null }, message.text),
+			});
+			if (fallback.ok) return;
+		}
 		throw new Error(
 			`Telegram send failed (${response.status}): ${(await response.text()).slice(0, 500)}`,
 		);
@@ -77,7 +106,7 @@ export async function sendLongTelegramMessage(
 		await sendTelegramMessage(env, {
 			chatId: message.chatId,
 			text: chunk,
-			parseMode: null,
+			parseMode: message.parseMode,
 		});
 	}
 }
