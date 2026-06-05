@@ -43,6 +43,7 @@ export interface CategoryContext {
 export interface HealthContextBundle {
 	date: string;
 	timezone: string;
+	rangeDays: number;
 	categories: CategoryContext[];
 }
 
@@ -130,6 +131,20 @@ function providerAllowed(category: HealthDataCategory, provider: DataProviderId)
 
 function idFor(userId: string, category: HealthDataCategory): string {
 	return `${userId}:${category}`;
+}
+
+function defaultRangeDaysForCategory(category: HealthDataCategory): number {
+	if (category === "hrv" || category === "sleep" || category === "recovery")
+		return 7;
+	if (category === "fitness_activities" || category === "gym_workouts") return 14;
+	return 1;
+}
+
+function rangeStartDate(date: string, rangeDays: number): string {
+	const parsed = new Date(`${date}T00:00:00Z`);
+	if (Number.isNaN(parsed.getTime())) return date;
+	parsed.setUTCDate(parsed.getUTCDate() - Math.max(rangeDays - 1, 0));
+	return parsed.toISOString().slice(0, 10);
 }
 
 export async function listDataPreferences(
@@ -264,6 +279,7 @@ async function collectCategoryData(
 	provider: DataProviderId,
 	timezone: string,
 	date: string,
+	rangeDays: number,
 ): Promise<CategoryContext> {
 	try {
 		if (category === "nutrition" && provider === "cronometer") {
@@ -308,8 +324,16 @@ async function collectCategoryData(
 			});
 			const data =
 				category === "fitness_activities"
-					? await client.getRecentActivities({ newest: date, limit: 20 })
-					: await client.getWellness({ newest: date, limit: 14 });
+					? await client.getRecentActivities({
+							oldest: rangeStartDate(date, rangeDays),
+							newest: date,
+							limit: Math.max(rangeDays, 20),
+						})
+					: await client.getWellness({
+							oldest: rangeStartDate(date, rangeDays),
+							newest: date,
+							limit: Math.max(rangeDays, 7),
+						});
 			return { category, provider, status: "ready", data };
 		}
 		if (provider === "fitbit" && (category === "sleep" || category === "steps" || category === "hrv" || category === "recovery" || category === "fitness_activities")) {
@@ -322,16 +346,32 @@ async function collectCategoryData(
 			});
 			const data =
 				category === "sleep"
-					? await client.getSleep(date)
+					? await Promise.all(
+							Array.from({ length: rangeDays }, (_, index) =>
+								client.getSleep(rangeStartDate(date, rangeDays - index)).catch((error) => ({
+									status: "error",
+									note: error instanceof Error ? error.message : String(error),
+								})),
+							),
+						)
 					: category === "hrv" || category === "recovery"
-						? await client.getHeartRate(date)
+						? await Promise.all(
+								Array.from({ length: rangeDays }, (_, index) =>
+									client
+										.getHeartRate(rangeStartDate(date, rangeDays - index))
+										.catch((error) => ({
+											status: "error",
+											note: error instanceof Error ? error.message : String(error),
+										})),
+								),
+							)
 						: await client.getActivitySummary(date);
 			return { category, provider, status: "ready", data };
 		}
 		if (provider === "google_fit" && (category === "steps" || category === "sleep" || category === "hrv")) {
 			const credentials = await serviceCredentials<Record<string, string>>(env, session, "google_fit");
-			const start = new Date(`${date}T00:00:00Z`).getTime();
-			const end = start + 24 * 60 * 60 * 1000;
+			const start = new Date(`${rangeStartDate(date, rangeDays)}T00:00:00Z`).getTime();
+			const end = new Date(`${date}T00:00:00Z`).getTime() + 24 * 60 * 60 * 1000;
 			const typeMap: Record<HealthDataCategory, string[]> = {
 				steps: ["com.google.step_count.delta"],
 				sleep: ["com.google.sleep.segment"],
@@ -381,6 +421,7 @@ export async function collectHealthContext(
 		categories: HealthDataCategory[];
 		timezone: string;
 		date: string;
+		rangeDays?: number;
 	},
 ): Promise<HealthContextBundle> {
 	const preferences = await listDataPreferences(env, session);
@@ -392,12 +433,23 @@ export async function collectHealthContext(
 			const provider = preference?.enabled
 				? preference.provider
 				: defaultProviderForCategory(category);
-			return collectCategoryData(env, session, category, provider, args.timezone, args.date);
+			return collectCategoryData(
+				env,
+				session,
+				category,
+				provider,
+				args.timezone,
+				args.date,
+				args.rangeDays ?? defaultRangeDaysForCategory(category),
+			);
 		}),
 	);
 	return {
 		date: args.date,
 		timezone: args.timezone,
+		rangeDays: Math.max(
+			...categories.map((category) => args.rangeDays ?? defaultRangeDaysForCategory(category)),
+		),
 		categories: contexts,
 	};
 }
