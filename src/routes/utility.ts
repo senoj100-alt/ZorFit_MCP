@@ -535,6 +535,21 @@ function settingsShell(title: string, body: string): string {
 			color: var(--muted);
 			font-size: 0.9rem;
 		}
+		.qr-link-panel {
+			display: grid;
+			grid-template-columns: minmax(0, 1fr) auto;
+			gap: 16px;
+			align-items: center;
+		}
+		.qr-link-panel img {
+			width: 156px;
+			height: 156px;
+			padding: 8px;
+			border-radius: 8px;
+			background: #fff;
+		}
+		.qr-link-panel p { margin: 0 0 10px; }
+		.qr-link-panel .button { margin-top: 6px; }
 		form .actions, .panel > .actions { margin-top: 18px; }
 		.section > .actions { margin: 0 0 14px; }
 		.time-row { align-items: end; margin-top: 10px; }
@@ -551,7 +566,7 @@ function settingsShell(title: string, body: string): string {
 			flex-wrap: wrap;
 		}
 		@media (max-width: 760px) {
-			.hero, .row { grid-template-columns: 1fr; }
+			.hero, .row, .qr-link-panel { grid-template-columns: 1fr; }
 			nav .shell { align-items: flex-start; flex-direction: column; padding: 14px 0; }
 			h1 { font-size: clamp(3rem, 18vw, 4.2rem); }
 		}
@@ -1191,7 +1206,18 @@ utilityRoutes.get("/settings/messaging/:id", async (c) => {
 				linkMessage.textContent = data.error || "Could not create Telegram link.";
 				return;
 			}
-			linkMessage.innerHTML = 'Open Telegram and tap Start: <a href="' + data.botUrl + '" target="_blank" rel="noreferrer">' + data.botUrl + '</a>';
+			const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + encodeURIComponent(data.botUrl);
+			linkMessage.innerHTML =
+				'<div class="qr-link-panel">' +
+					'<div>' +
+						'<p><strong>Option 1: open on this device</strong></p>' +
+						'<a class="button primary" href="' + data.botUrl + '" target="_blank" rel="noreferrer">Open Telegram</a>' +
+						'<p style="margin-top:12px;"><strong>Option 2: scan from mobile</strong></p>' +
+						'<p>Open your phone camera or Telegram QR scanner, scan the code, then tap Start to link your account.</p>' +
+						'<p><a href="' + data.botUrl + '" target="_blank" rel="noreferrer">' + data.botUrl + '</a></p>' +
+					'</div>' +
+					'<img alt="Telegram link QR code" src="' + qrUrl + '">' +
+				'</div>';
 			window.open(data.botUrl, "_blank", "noopener,noreferrer");
 		});
 		const times = document.getElementById("times");
