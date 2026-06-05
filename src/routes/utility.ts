@@ -1117,6 +1117,12 @@ utilityRoutes.get("/settings/messaging/:id", async (c) => {
 		? schedule.times
 		: ["06:00", "10:00", "15:00", "22:00"];
 	const selectedTimezone = schedule?.timezone ?? "America/New_York";
+	const telegramReady = Boolean(
+		c.env.TELEGRAM_BOT_TOKEN && c.env.TELEGRAM_BOT_USERNAME,
+	);
+	const telegramHelper = telegramReady
+		? `Click Connect Telegram to open @${escapeHtml(c.env.TELEGRAM_BOT_USERNAME ?? "your_bot")} and link your account with a secure one-time code.`
+		: "A Telegram bot token and bot username must be configured in Cloudflare before the deep link can be used in production.";
 	const body = `<main class="shell">
 		<section class="hero">
 			<div>
@@ -1131,10 +1137,10 @@ utilityRoutes.get("/settings/messaging/:id", async (c) => {
 		</section>
 		<div class="panel">
 			<div class="actions">
-				<button class="primary" id="connectTelegram" type="button" ${session ? "" : "disabled"}>${telegram?.enabled ? "Reconnect Telegram" : "Connect Telegram"}</button>
+				<button class="primary" id="connectTelegram" type="button" ${session && telegramReady ? "" : "disabled"}>${telegram?.enabled ? "Reconnect Telegram" : "Connect Telegram"}</button>
 				<a class="button" href="/settings/messages">Back to messages</a>
 			</div>
-			<div class="helper" id="telegramLinkMessage">A Telegram bot token and bot username must be configured in Cloudflare before the deep link can be used in production.</div>
+			<div class="helper" id="telegramLinkMessage">${telegramHelper}</div>
 		</div>
 		<form class="panel" id="scheduleForm">
 			<label>
@@ -1340,11 +1346,11 @@ utilityRoutes.post("/api/ai-preferences", async (c) => {
 utilityRoutes.post("/api/telegram/link-code", async (c) => {
 	const session = await getSettingsSession(c);
 	if (!session) return c.json({ error: "Unauthorized" }, 401);
-	if (!c.env.TELEGRAM_BOT_USERNAME) {
+	if (!c.env.TELEGRAM_BOT_TOKEN || !c.env.TELEGRAM_BOT_USERNAME) {
 		return c.json(
 			{
 				error:
-					"TELEGRAM_BOT_USERNAME must be configured before Telegram linking is available.",
+					"TELEGRAM_BOT_TOKEN and TELEGRAM_BOT_USERNAME must be configured before Telegram linking is available.",
 			},
 			503,
 		);
