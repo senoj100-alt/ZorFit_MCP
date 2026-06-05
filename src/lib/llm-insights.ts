@@ -378,6 +378,19 @@ function compactHealthContext(context: unknown, maximumLength: number): string {
 		timezone: bundle.timezone,
 		categories: (Array.isArray(bundle.categories) ? bundle.categories : []).map(
 			(category) => {
+				const source =
+					category.data && typeof category.data === "object"
+						? (category.data as Record<string, unknown>)
+						: null;
+				const nutritionPriority =
+					category.category === "nutrition" && source
+						? {
+								date: source.date,
+								macroSummary: source.macroSummary,
+								summary: source.summary,
+								compactNutrition: compactGroqNutrition(source, 1800),
+							}
+						: undefined;
 				const dataJson = JSON.stringify(category.data ?? null);
 				return {
 					category: category.category,
@@ -385,9 +398,10 @@ function compactHealthContext(context: unknown, maximumLength: number): string {
 					status: category.status,
 					note: category.note,
 					data:
-						dataJson.length > 900
+						nutritionPriority ??
+						(dataJson.length > 900
 							? `${dataJson.slice(0, 900)}...`
-							: category.data,
+							: category.data),
 				};
 			},
 		),

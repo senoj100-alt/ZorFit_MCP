@@ -71,6 +71,88 @@ const APP_AUTH = {
 	flavour: "free",
 };
 
+function numericValue(value: unknown): number | undefined {
+	if (typeof value === "number" && Number.isFinite(value)) return value;
+	if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) {
+		return Number(value);
+	}
+	return undefined;
+}
+
+function extractNutrientAmount(
+	value: unknown,
+	nutrientId: number,
+	seen = new Set<unknown>(),
+): number | undefined {
+	if (!value || typeof value !== "object" || seen.has(value)) return undefined;
+	seen.add(value);
+	if (Array.isArray(value)) {
+		if (
+			value.length >= 2 &&
+			String(value[0]) === String(nutrientId) &&
+			numericValue(value[1]) !== undefined
+		) {
+			return numericValue(value[1]);
+		}
+		for (const child of value) {
+			const found = extractNutrientAmount(child, nutrientId, seen);
+			if (found !== undefined) return found;
+		}
+		return undefined;
+	}
+	const record = value as Record<string, unknown>;
+	const id = record.id ?? record.nutrientId ?? record.nutrient_id;
+	if (String(id) === String(nutrientId)) {
+		const amount =
+			numericValue(record.amount) ??
+			numericValue(record.value) ??
+			numericValue(record.consumed) ??
+			numericValue(record.total);
+		if (amount !== undefined) return amount;
+	}
+	const direct = numericValue(record[String(nutrientId)]);
+	if (direct !== undefined) return direct;
+	for (const child of Object.values(record)) {
+		const found = extractNutrientAmount(child, nutrientId, seen);
+		if (found !== undefined) return found;
+	}
+	return undefined;
+}
+
+function summaryNumber(
+	summary: Record<string, unknown> | null | undefined,
+	keys: string[],
+): number | undefined {
+	if (!summary) return undefined;
+	for (const key of keys) {
+		const found = numericValue(summary[key]);
+		if (found !== undefined) return found;
+	}
+	return undefined;
+}
+
+function normalizedMacroSummary(
+	summary: Record<string, unknown> | null | undefined,
+	nutrients: unknown,
+	nutritionScores: unknown,
+): Record<string, number | undefined> {
+	const valueFor = (id: number, keys: string[]) =>
+		extractNutrientAmount(nutrients, id) ??
+		extractNutrientAmount(nutritionScores, id) ??
+		summaryNumber(summary, keys);
+	return {
+		calories_kcal: valueFor(NUTRIENT_IDS.energy, ["energy", "calories", "kcal"]),
+		protein_g: valueFor(NUTRIENT_IDS.protein, ["protein", "proteinG", "protein_g"]),
+		carbs_g: valueFor(NUTRIENT_IDS.carbs, ["carbs", "carbohydrate", "carbohydrates", "carbsG", "carbs_g"]),
+		fat_g: valueFor(NUTRIENT_IDS.fat, ["fat", "totalFat", "fatG", "fat_g"]),
+		net_carbs_g: valueFor(NUTRIENT_IDS.netCarbs, ["netCarbs", "net_carbs"]),
+		sugar_g: valueFor(NUTRIENT_IDS.sugar, ["sugar", "sugars", "sugar_g"]),
+		fiber_g: valueFor(NUTRIENT_IDS.fiber, ["fiber", "fiber_g"]),
+		sodium_mg: valueFor(NUTRIENT_IDS.sodium, ["sodium", "sodium_mg"]),
+		alcohol_g: valueFor(NUTRIENT_IDS.alcohol, ["alcohol", "alcohol_g"]),
+	};
+}
+
 export class CronometerClient {
 	private readonly baseUrl = "https://mobile.cronometer.com";
 	private userId?: number;
@@ -493,6 +575,11 @@ export class CronometerClient {
 		return {
 			date: date ?? new Date().toISOString().slice(0, 10),
 			summary: diary.summary ?? null,
+			macroSummary: normalizedMacroSummary(
+				diary.summary,
+				nutrients,
+				nutritionScores,
+			),
 			nutrients,
 			nutritionScores,
 			entries: diary.diary ?? [],

@@ -302,7 +302,15 @@ describe("LLM routed health insights", () => {
 							category: "nutrition",
 							provider: "cronometer",
 							status: "ready",
-							data: { entries: Array.from({ length: 100 }, () => "x".repeat(500)) },
+							data: {
+								macroSummary: {
+									calories_kcal: 2200,
+									protein_g: 130,
+									carbs_g: 260,
+									fat_g: 72,
+								},
+								entries: Array.from({ length: 100 }, () => "x".repeat(500)),
+							},
 						},
 						{
 							category: "fitness_activities",
@@ -326,6 +334,10 @@ describe("LLM routed health insights", () => {
 		expect(retryBody.messages[1].content).toContain(
 			"Compact ZorFit context JSON",
 		);
+		expect(retryBody.messages[1].content).toContain('"calories_kcal":2200');
+		expect(retryBody.messages[1].content).toContain('"protein_g":130');
+		expect(retryBody.messages[1].content).toContain('"carbs_g":260');
+		expect(retryBody.messages[1].content).toContain('"fat_g":72');
 		expect(retryBody.messages[1].content).toContain(
 			"ZorFit compacted routed health context",
 		);
