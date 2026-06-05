@@ -342,7 +342,10 @@ function healthPrompt(input: HealthInsightInput, maximumContextLength = 50000): 
 		"Use only the supplied ZorFit context. Do not invent missing workouts, nutrients, sleep, HRV, steps, or recovery values.",
 		"Explain what the data suggests, what is uncertain, and what the user can practically do next.",
 		"Do not diagnose, prescribe, or present medical advice. Do not recommend unsafe restriction, extreme dieting, or medication/supplement changes.",
-		"Use clear headings and short paragraphs or bullets. If Telegram formatting is later applied, markdown headings and bold text are acceptable.",
+		"Write for Telegram readability: use short sections, bullets, and line breaks.",
+		"Do not use markdown tables, wide tables, or long checklists. Convert comparisons into compact bullet lists.",
+		"Keep numeric trend summaries to the most important 3-6 points unless the user explicitly asks for exhaustive rows.",
+		"Markdown headings and bold text are acceptable.",
 		input.promptInstructions
 			? `User style/focus preferences:\n${input.promptInstructions.slice(0, 1000)}`
 			: "User style/focus preferences: none provided.",
@@ -418,6 +421,7 @@ function compactHealthPrompt(
 		"You are ZorFit, a careful AI health and training insight assistant.",
 		"Use only the supplied compact ZorFit context. Say when deeper source data is needed.",
 		"Give practical next steps without medical diagnosis, prescriptions, unsafe restriction, or supplement/medication changes.",
+		"Write for Telegram readability: no markdown tables, no wide tables, short sections, and compact bullets.",
 		input.promptInstructions
 			? `User style/focus preferences:\n${input.promptInstructions.slice(0, 700)}`
 			: "User style/focus preferences: none provided.",

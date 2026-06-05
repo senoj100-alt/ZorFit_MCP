@@ -36,6 +36,16 @@ describe("Telegram messages", () => {
 		);
 	});
 
+	it("converts markdown tables into readable Telegram lines", () => {
+		expect(
+			formatTelegramHtmlFromMarkdown(
+				"## Trend\n\n| Date | Sleep | HRV |\n|------|-------|-----|\n| 2026-06-05 | 6.0 h | **70** |\n\n---\n\nNext step",
+			),
+		).toBe(
+			"<b>Trend</b>\n\n• Date: Sleep | HRV\n• 2026-06-05: 6.0 h | <b>70</b>\n\nNext step",
+		);
+	});
+
 	it("sends formatted HTML by default", async () => {
 		const fetchMock = vi
 			.spyOn(globalThis, "fetch")

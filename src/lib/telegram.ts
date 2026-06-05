@@ -10,17 +10,51 @@ export interface TelegramMessage {
 
 export function formatTelegramHtmlFromMarkdown(text: string): string {
 	const escaped = escapeTelegramHtml(text);
-	return escaped
-		.split("\n")
-		.map((line) => {
-			const heading = line.match(/^#{1,6}\s+(.+)$/);
-			const normalizedLine = heading ? `<b>${heading[1]}</b>` : line;
-			const bulletLine = normalizedLine.replace(/^(\s*)[-*]\s+/u, "$1• ");
-			return bulletLine
-				.replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>")
-				.replace(/__([^_\n]+)__/g, "<b>$1</b>");
-		})
-		.join("\n");
+	const lines = escaped.split("\n");
+	const formatted: string[] = [];
+	for (const line of lines) {
+		if (/^\s*-{3,}\s*$/.test(line)) {
+			if (formatted[formatted.length - 1] !== "") formatted.push("");
+			continue;
+		}
+		if (/^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(line)) {
+			continue;
+		}
+		const tableCells = markdownTableCells(line);
+		if (tableCells.length > 1) {
+			formatted.push(formatTableCells(tableCells));
+			continue;
+		}
+		const heading = line.match(/^#{1,6}\s+(.+)$/);
+		const normalizedLine = heading ? `<b>${heading[1]}</b>` : line;
+		const bulletLine = normalizedLine.replace(/^(\s*)[-*]\s+/u, "$1• ");
+		formatted.push(formatTelegramInlineMarkdown(bulletLine));
+	}
+	return formatted.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function markdownTableCells(line: string): string[] {
+	const trimmed = line.trim();
+	if (!trimmed.includes("|")) return [];
+	const withoutEdges = trimmed.replace(/^\|/, "").replace(/\|$/, "");
+	return withoutEdges
+		.split("|")
+		.map((cell) => cell.trim())
+		.filter(Boolean);
+}
+
+function formatTableCells(cells: string[]): string {
+	const line =
+		cells.length <= 2
+			? `• ${cells.join(": ")}`
+			: `• ${cells[0]}: ${cells.slice(1).join(" | ")}`;
+	return formatTelegramInlineMarkdown(line);
+}
+
+function formatTelegramInlineMarkdown(line: string): string {
+	return line
+		.replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>")
+		.replace(/__([^_\n]+)__/g, "<b>$1</b>");
 }
 
 function telegramPayload(message: TelegramMessage, text: string): string {
