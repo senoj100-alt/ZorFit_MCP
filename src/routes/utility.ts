@@ -610,12 +610,33 @@ function settingsShell(title: string, body: string): string {
 			margin-top: 16px;
 			padding: 18px;
 		}
+		.schedule-card.collapsed .schedule-body {
+			display: none;
+		}
 		.schedule-head {
 			display: flex;
 			justify-content: space-between;
 			gap: 12px;
 			align-items: flex-start;
 			margin-bottom: 12px;
+		}
+		.schedule-head button {
+			min-height: 34px;
+			padding: 7px 10px;
+		}
+		.schedule-title {
+			display: grid;
+			gap: 7px;
+		}
+		.schedule-title-row {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+			flex-wrap: wrap;
+		}
+		.schedule-title h3 {
+			font-size: 1.15rem;
+			line-height: 1.2;
 		}
 		.question-bank {
 			display: flex;
@@ -1373,51 +1394,58 @@ utilityRoutes.get("/settings/messaging/telegram", async (c) => {
 		const times = schedule.times.length ? schedule.times : ["10:00"];
 		return `<form class="panel schedule-card" data-message-form data-id="${escapeHtml(schedule.id)}">
 			<div class="schedule-head">
-				<div>
-					<span class="status">${schedule.enabled ? "Enabled" : "Draft"}</span>
-					<h3>${escapeHtml(schedule.title || `Message ${index + 1}`)}</h3>
+				<div class="schedule-title">
+					<div class="schedule-title-row">
+						<span class="status">${schedule.enabled ? "Enabled" : "Draft"}</span>
+						<h3 data-message-title>${escapeHtml(schedule.title || `Message ${index + 1}`)}</h3>
+					</div>
 				</div>
-				<button type="button" class="danger" data-delete-message ${schedule.id ? "" : "disabled"}>Delete</button>
-			</div>
-			<label>
-				<input name="enabled" type="checkbox" ${schedule.enabled ? "checked" : ""} style="width:auto; min-height:auto; margin-right:8px;">
-				Enable this scheduled message
-			</label>
-			<label>Message name</label>
-			<input name="title" value="${escapeHtml(schedule.title)}" placeholder="Morning recovery briefing">
-			<div class="row">
-				<div>
-					<label>Timezone</label>
-					<select name="timezone">${timezoneOptions(schedule.timezone)}</select>
-				</div>
-				<div>
-					<label>Insight mode</label>
-					<select name="insightMode">
-						<option value="smart" ${schedule.insightMode === "smart" ? "selected" : ""}>Smart</option>
-						<option value="today_so_far" ${schedule.insightMode === "today_so_far" ? "selected" : ""}>Today so far</option>
-						<option value="previous_day" ${schedule.insightMode === "previous_day" ? "selected" : ""}>Previous day</option>
-					</select>
+				<div class="actions" style="margin-top:0;">
+					<button type="button" data-toggle-message>Collapse</button>
+					<button type="button" class="danger" data-delete-message>Delete</button>
 				</div>
 			</div>
-			<label>Insight times</label>
-			<div data-times>${times.map((time) => `<div class="row time-row"><input name="times" value="${escapeHtml(time)}" placeholder="HH:MM"><button type="button" data-remove-time>Remove</button></div>`).join("")}</div>
-			<div class="actions"><button type="button" data-add-time>Add time</button></div>
-			<label>Include data categories</label>
-			<div class="checkbox-grid" data-categories>${categoryChecks(schedule.categories)}</div>
-			<div class="helper">ZorFit uses your Data Routing settings to decide which provider supplies each selected category.</div>
-			<label>Question or instruction</label>
-			<textarea name="question" maxlength="${MESSAGE_QUESTION_LIMIT}" placeholder="Example: Should I train hard today based on recovery, sleep, and recent activity?">${escapeHtml(schedule.question ?? "")}</textarea>
-			<div class="question-bank" data-question-bank></div>
-			<div class="field-meta">
-				<label>Style instructions</label>
-				<span class="count" data-prompt-count>0/${PROMPT_INSTRUCTIONS_LIMIT}</span>
+			<div class="schedule-body">
+				<label>
+					<input name="enabled" type="checkbox" ${schedule.enabled ? "checked" : ""} style="width:auto; min-height:auto; margin-right:8px;">
+					Enable this scheduled message
+				</label>
+				<label>Message name</label>
+				<input name="title" value="${escapeHtml(schedule.title)}" placeholder="Morning recovery briefing">
+				<div class="row">
+					<div>
+						<label>Timezone</label>
+						<select name="timezone">${timezoneOptions(schedule.timezone)}</select>
+					</div>
+					<div>
+						<label>Insight mode</label>
+						<select name="insightMode">
+							<option value="smart" ${schedule.insightMode === "smart" ? "selected" : ""}>Smart</option>
+							<option value="today_so_far" ${schedule.insightMode === "today_so_far" ? "selected" : ""}>Today so far</option>
+							<option value="previous_day" ${schedule.insightMode === "previous_day" ? "selected" : ""}>Previous day</option>
+						</select>
+					</div>
+				</div>
+				<label>Insight times</label>
+				<div data-times>${times.map((time) => `<div class="row time-row"><input name="times" value="${escapeHtml(time)}" placeholder="HH:MM"><button type="button" data-remove-time>Remove</button></div>`).join("")}</div>
+				<div class="actions"><button type="button" data-add-time>Add time</button></div>
+				<label>Include data categories</label>
+				<div class="checkbox-grid" data-categories>${categoryChecks(schedule.categories)}</div>
+				<div class="helper">ZorFit uses your Data Routing settings to decide which provider supplies each selected category.</div>
+				<label>Question or instruction</label>
+				<textarea name="question" maxlength="${MESSAGE_QUESTION_LIMIT}" placeholder="Example: Should I train hard today based on recovery, sleep, and recent activity?">${escapeHtml(schedule.question ?? "")}</textarea>
+				<div class="question-bank" data-question-bank></div>
+				<div class="field-meta">
+					<label>Style instructions</label>
+					<span class="count" data-prompt-count>0/${PROMPT_INSTRUCTIONS_LIMIT}</span>
+				</div>
+				<textarea class="large-textarea" name="promptInstructions" maxlength="${PROMPT_INSTRUCTIONS_LIMIT}" placeholder="Example: Be direct but supportive. Include the not-medical-advice disclaimer.">${escapeHtml(schedule.promptInstructions ?? "")}</textarea>
+				<div class="actions">
+					<button class="primary" type="submit" ${session ? "" : "disabled"}>Save message</button>
+					<button type="button" data-test-message ${session ? "" : "disabled"}>Send test now</button>
+				</div>
+				<div data-message-status id="message"></div>
 			</div>
-			<textarea class="large-textarea" name="promptInstructions" maxlength="${PROMPT_INSTRUCTIONS_LIMIT}" placeholder="Example: Be direct but supportive. Include the not-medical-advice disclaimer.">${escapeHtml(schedule.promptInstructions ?? "")}</textarea>
-			<div class="actions">
-				<button class="primary" type="submit" ${session ? "" : "disabled"}>Save message</button>
-				<button type="button" data-test-message ${session ? "" : "disabled"}>Send test now</button>
-			</div>
-			<div data-message-status id="message"></div>
 		</form>`;
 	};
 	const blankCard = renderMessageCard(
@@ -1460,7 +1488,11 @@ utilityRoutes.get("/settings/messaging/telegram", async (c) => {
 					<span class="eyebrow">Scheduled messages</span>
 					<h2>Build Telegram check-ins.</h2>
 				</div>
-				<button class="primary" type="button" id="addMessage">+ New message</button>
+				<div class="actions" style="margin-top:0;">
+					<button type="button" id="collapseAllMessages">Collapse all</button>
+					<button type="button" id="expandAllMessages">Expand all</button>
+					<button class="primary" type="button" id="addMessage">+ New message</button>
+				</div>
 			</div>
 			<div id="messageList">${initialSchedules.map(renderMessageCard).join("")}</div>
 		</section>
@@ -1526,6 +1558,16 @@ utilityRoutes.get("/settings/messaging/telegram", async (c) => {
 			const updateCount = () => { count.textContent = prompt.value.length + "/" + promptLimit; };
 			prompt.addEventListener("input", updateCount);
 			updateCount();
+			const titleInput = form.elements.title;
+			const titleDisplay = form.querySelector("[data-message-title]");
+			titleInput?.addEventListener("input", () => {
+				titleDisplay.textContent = titleInput.value.trim() || "Untitled message";
+			});
+			const setCollapsed = (collapsed) => {
+				form.classList.toggle("collapsed", collapsed);
+				const button = form.querySelector("[data-toggle-message]");
+				if (button) button.textContent = collapsed ? "Expand" : "Collapse";
+			};
 			form.querySelector("[data-add-time]")?.addEventListener("click", () => {
 				const row = document.createElement("div");
 				row.className = "row time-row";
@@ -1535,9 +1577,21 @@ utilityRoutes.get("/settings/messaging/telegram", async (c) => {
 			form.addEventListener("click", async (event) => {
 				if (event.target.dataset?.removeTime !== undefined) event.target.closest(".time-row")?.remove();
 				if (event.target.dataset?.question) form.elements.question.value = event.target.dataset.question;
-				if (event.target.dataset?.deleteMessage !== undefined && form.dataset.id) {
+				if (event.target.dataset?.toggleMessage !== undefined) {
+					setCollapsed(!form.classList.contains("collapsed"));
+				}
+				if (event.target.dataset?.deleteMessage !== undefined) {
+					if (!form.dataset.id) {
+						form.remove();
+						return;
+					}
 					const response = await fetch("/api/message-schedules/" + form.dataset.id, { method: "DELETE" });
-					if (response.ok) form.remove();
+					if (response.ok) {
+						form.remove();
+					} else {
+						const data = await response.json().catch(() => ({}));
+						form.querySelector("[data-message-status]").textContent = data.error || "Could not delete message.";
+					}
 				}
 				if (event.target.dataset?.testMessage !== undefined) {
 					const status = form.querySelector("[data-message-status]");
@@ -1579,6 +1633,20 @@ utilityRoutes.get("/settings/messaging/telegram", async (c) => {
 			const form = wrapper.firstElementChild;
 			document.getElementById("messageList").appendChild(form);
 			wireForm(form);
+		});
+		document.getElementById("collapseAllMessages")?.addEventListener("click", () => {
+			document.querySelectorAll("[data-message-form]").forEach((form) => {
+				form.classList.add("collapsed");
+				const button = form.querySelector("[data-toggle-message]");
+				if (button) button.textContent = "Expand";
+			});
+		});
+		document.getElementById("expandAllMessages")?.addEventListener("click", () => {
+			document.querySelectorAll("[data-message-form]").forEach((form) => {
+				form.classList.remove("collapsed");
+				const button = form.querySelector("[data-toggle-message]");
+				if (button) button.textContent = "Collapse";
+			});
 		});
 	</script>`;
 	return c.html(settingsShell("Telegram", body));
@@ -1804,6 +1872,7 @@ utilityRoutes.get("/coach", async (c) => {
 			const question = form.elements.question.value.trim();
 			if (!question) return;
 			appendMessage(question, "user");
+			form.elements.question.value = "";
 			document.getElementById("message").textContent = "Fetching data and asking your AI model...";
 			const response = await fetch("/api/coach-chat", {
 				method: "POST",
