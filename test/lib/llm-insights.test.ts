@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AiConnection } from "../../src/lib/ai-connections.js";
-import { generateNutritionInsight } from "../../src/lib/llm-insights.js";
+import {
+	generateHealthInsight,
+	generateNutritionInsight,
+} from "../../src/lib/llm-insights.js";
 
 const INPUT = {
 	date: "2026-06-03",
@@ -256,5 +259,76 @@ describe("LLM nutrition insights", () => {
 		const result = await generateNutritionInsight(connection(), INPUT);
 		expect(result).toContain("Usable compact nutrition insight");
 		expect(result).toContain("Groq reached its output limit");
+	});
+});
+
+describe("LLM routed health insights", () => {
+	it("retries Groq token-limit failures with compact routed health context", async () => {
+		const fetchMock = vi
+			.spyOn(globalThis, "fetch")
+			.mockResolvedValueOnce(
+				new Response(
+					JSON.stringify({
+						error: {
+							message: "Limit 8000, Requested 10929",
+							type: "tokens",
+							code: "rate_limit_exceeded",
+						},
+					}),
+					{ status: 413 },
+				),
+			)
+			.mockResolvedValueOnce(
+				new Response(
+					JSON.stringify({
+						choices: [{ message: { content: "Compact health insight" } }],
+					}),
+					{ status: 200 },
+				),
+			);
+
+		await expect(
+			generateHealthInsight(connection(), {
+				date: "2026-06-05",
+				timezone: "America/New_York",
+				title: "Recovery briefing",
+				question: "Should I train hard today?",
+				categories: ["nutrition", "fitness_activities", "recovery"],
+				context: {
+					date: "2026-06-05",
+					timezone: "America/New_York",
+					categories: [
+						{
+							category: "nutrition",
+							provider: "cronometer",
+							status: "ready",
+							data: { entries: Array.from({ length: 100 }, () => "x".repeat(500)) },
+						},
+						{
+							category: "fitness_activities",
+							provider: "strava",
+							status: "ready",
+							data: Array.from({ length: 100 }, (_, index) => ({
+								name: `Activity ${index}`,
+								description: "y".repeat(500),
+							})),
+						},
+					],
+				},
+			}),
+		).resolves.toBe("Compact health insight");
+
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+		const retryBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
+		expect(retryBody.max_completion_tokens).toBe(4000);
+		expect(retryBody.include_reasoning).toBe(false);
+		expect(retryBody.reasoning_effort).toBe("low");
+		expect(retryBody.messages[1].content).toContain(
+			"Compact ZorFit context JSON",
+		);
+		expect(retryBody.messages[1].content).toContain(
+			"ZorFit compacted routed health context",
+		);
+		expect(retryBody.messages[1].content.length).toBeLessThan(9000);
 	});
 });

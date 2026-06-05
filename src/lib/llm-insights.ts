@@ -34,6 +34,8 @@ const DEFAULT_BASE_URLS: Record<AiProviderId, string> = {
 
 const GROQ_COMPACT_NUTRITION_LENGTH = 4500;
 const GROQ_413_NUTRITION_LENGTH = 3000;
+const GROQ_COMPACT_HEALTH_CONTEXT_LENGTH = 4500;
+const GROQ_413_HEALTH_CONTEXT_LENGTH = 2800;
 const GROQ_RESCUE_COMPLETION_TOKENS = 4000;
 
 function trimSlash(value: string): string {
@@ -356,6 +358,65 @@ function healthPrompt(input: HealthInsightInput, maximumContextLength = 50000): 
 	].join("\n");
 }
 
+function compactHealthContext(context: unknown, maximumLength: number): string {
+	if (!context || typeof context !== "object") {
+		return JSON.stringify(context).slice(0, maximumLength);
+	}
+	const bundle = context as {
+		date?: unknown;
+		timezone?: unknown;
+		categories?: Array<{
+			category?: unknown;
+			provider?: unknown;
+			status?: unknown;
+			note?: unknown;
+			data?: unknown;
+		}>;
+	};
+	const compact = {
+		date: bundle.date,
+		timezone: bundle.timezone,
+		categories: (Array.isArray(bundle.categories) ? bundle.categories : []).map(
+			(category) => {
+				const dataJson = JSON.stringify(category.data ?? null);
+				return {
+					category: category.category,
+					provider: category.provider,
+					status: category.status,
+					note: category.note,
+					data:
+						dataJson.length > 900
+							? `${dataJson.slice(0, 900)}...`
+							: category.data,
+				};
+			},
+		),
+		note: "ZorFit compacted routed health context to fit the selected LLM provider limit. Use connected source-specific tools for deeper raw data.",
+	};
+	return JSON.stringify(compact).slice(0, maximumLength);
+}
+
+function compactHealthPrompt(
+	input: HealthInsightInput,
+	maximumContextLength: number,
+): string {
+	return [
+		"You are ZorFit, a careful AI health and training insight assistant.",
+		"Use only the supplied compact ZorFit context. Say when deeper source data is needed.",
+		"Give practical next steps without medical diagnosis, prescriptions, unsafe restriction, or supplement/medication changes.",
+		input.promptInstructions
+			? `User style/focus preferences:\n${input.promptInstructions.slice(0, 700)}`
+			: "User style/focus preferences: none provided.",
+		`Title: ${input.title ?? "ZorFit insight"}.`,
+		`Date: ${input.date}.`,
+		`Timezone: ${input.timezone}.`,
+		`Selected categories: ${input.categories.join(", ")}.`,
+		`User question: ${input.question}.`,
+		"Compact ZorFit context JSON:",
+		compactHealthContext(input.context, maximumContextLength),
+	].join("\n");
+}
+
 function openAiRequestSettings(connection: AiConnection): AiRequestSettings {
 	const recommended = recommendedAiRequestSettings(
 		connection.provider,
@@ -531,34 +592,82 @@ async function callOpenAiCompatibleHealth(
 		connection.baseUrl || DEFAULT_BASE_URLS[connection.provider],
 	);
 	const requestSettings = openAiRequestSettings(connection);
-	const response = await fetch(`${baseUrl}/chat/completions`, {
-		method: "POST",
-		headers: {
-			Authorization: `Bearer ${connection.apiKey}`,
-			"Content-Type": "application/json",
-		},
-		body: JSON.stringify({
-			...requestSettings,
-			model: connection.modelName,
-			messages: [
-				{
-					role: "system",
-					content:
-						"You produce safe, practical, non-medical health and training insights for consumer wellness software.",
-				},
-				{ role: "user", content: healthPrompt(input) },
-			],
-		}),
-	});
+	const request = (
+		settings: AiRequestSettings,
+		maximumContextLength = 50000,
+		compactForGroq = false,
+	) =>
+		fetch(`${baseUrl}/chat/completions`, {
+			method: "POST",
+			headers: {
+				Authorization: `Bearer ${connection.apiKey}`,
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({
+				...settings,
+				model: connection.modelName,
+				messages: [
+					{
+						role: "system",
+						content:
+							"You produce safe, practical, non-medical health and training insights for consumer wellness software.",
+					},
+					{
+						role: "user",
+						content: compactForGroq
+							? compactHealthPrompt(input, maximumContextLength)
+							: healthPrompt(input, maximumContextLength),
+					},
+				],
+			}),
+		});
+	let response = await request(requestSettings);
+	let usedCompactRetry = false;
+	if (response.status === 413 && connection.provider === "groq") {
+		response = await request(
+			groqRescueRequestSettings(requestSettings, connection),
+			GROQ_413_HEALTH_CONTEXT_LENGTH,
+			true,
+		);
+		usedCompactRetry = true;
+	}
 	if (!response.ok) {
+		if (response.status === 413 && connection.provider === "groq") {
+			throw new Error(
+				"Groq rejected the compact routed health context because your account token limit is too low for the selected categories. Select fewer categories, use a smaller Groq model, choose another AI provider, or upgrade the Groq tier.",
+			);
+		}
 		throw new Error(
 			`LLM request failed (${response.status}): ${(await response.text()).slice(0, 500)}`,
 		);
 	}
 	const data = (await response.json()) as {
-		choices?: Array<{ message?: { content?: unknown } }>;
+		choices?: Array<{ finish_reason?: string; message?: { content?: unknown } }>;
 	};
-	const text = textFromOpenAiContent(data.choices?.[0]?.message?.content);
+	let choice = data.choices?.[0];
+	let text = textFromOpenAiContent(choice?.message?.content);
+	if (
+		choice?.finish_reason === "length" &&
+		connection.provider === "groq" &&
+		!usedCompactRetry
+	) {
+		const retry = await request(
+			groqRescueRequestSettings(requestSettings, connection),
+			GROQ_COMPACT_HEALTH_CONTEXT_LENGTH,
+			true,
+		);
+		if (!retry.ok) {
+			throw new Error(
+				`Groq retry failed (${retry.status}): ${(await retry.text()).slice(0, 500)}`,
+			);
+		}
+		const retryData = (await retry.json()) as typeof data;
+		choice = retryData.choices?.[0];
+		text = textFromOpenAiContent(choice?.message?.content);
+	}
+	if (choice?.finish_reason === "length" && text) {
+		return `${text}\n\nNote: Groq reached its output limit, so this insight may end early. Use fewer selected categories, raise max_completion_tokens, or select a provider with a larger output budget.`;
+	}
 	if (!text) throw new Error("LLM response did not include final text.");
 	return text;
 }
