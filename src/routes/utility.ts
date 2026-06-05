@@ -27,6 +27,7 @@ import {
 import { sendTestNutritionInsight } from "../lib/scheduled-nutrition.js";
 import { getZorFitServiceStatuses } from "../lib/service-registry.js";
 import { sendTelegramMessage } from "../lib/telegram.js";
+import { ZORFIT_BRAND, ZORFIT_THEME_CSS } from "../lib/zorfit-theme.js";
 import type { Props } from "../utils.js";
 import { renderZorFitLandingPage } from "./zorfit-landing.js";
 
@@ -77,10 +78,10 @@ utilityRoutes.get("/signup", (c) => {
 	);
 	const githubAction = githubReady
 		? `<a class="button primary" href="/connections">Continue with GitHub</a>`
-		: `<span class="button disabled">GitHub setup pending</span>`;
+		: `<span class="button disabled">GitHub sign-in needs setup</span>`;
 	const googleAction = googleReady
 		? `<a class="button google" href="/auth/google?return_to=/connections">Continue with Google</a>`
-		: `<span class="button disabled">Google setup pending</span>`;
+		: `<span class="button disabled">Google sign-in needs setup</span>`;
 
 	const html = `<!DOCTYPE html>
 <html lang="en">
@@ -89,59 +90,26 @@ utilityRoutes.get("/signup", (c) => {
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Sign up - ZorFit_MCP</title>
 	<style>
-		:root {
-			color-scheme: dark;
-			font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-			--bg: #080b10;
-			--panel: #10151f;
-			--line: #273142;
-			--text: #f5f7fb;
-			--muted: #aab4c5;
-			--green: #8ee6b1;
-			--ink: #091019;
-		}
-		* { box-sizing: border-box; }
+		${ZORFIT_THEME_CSS}
 		body {
-			margin: 0;
 			min-height: 100vh;
 			display: grid;
 			place-items: center;
 			padding: 24px;
-			color: var(--text);
-			background:
-				radial-gradient(circle at 80% 4%, rgba(157, 185, 255, 0.18), transparent 30rem),
-				linear-gradient(180deg, #0c1119 0%, var(--bg) 100%);
 		}
 		main {
 			width: min(620px, 100%);
 			padding: 30px;
-			border: 1px solid rgba(255, 255, 255, 0.12);
+			border: 1px solid rgba(245, 242, 236, 0.12);
 			border-radius: 8px;
-			background: var(--panel);
+			background: linear-gradient(180deg, rgba(245, 242, 236, 0.07), rgba(245, 242, 236, 0.035));
 			box-shadow: 0 34px 90px rgba(0, 0, 0, 0.32);
 		}
-		.brand {
-			display: inline-flex;
-			align-items: center;
-			gap: 10px;
-			margin-bottom: 28px;
-			font-weight: 850;
-		}
-		.mark {
-			display: grid;
-			place-items: center;
-			width: 34px;
-			height: 34px;
-			border-radius: 8px;
-			background: linear-gradient(135deg, var(--green), #9db9ff);
-			color: var(--ink);
-			font-weight: 900;
-		}
+		.brand { margin-bottom: 28px; }
 		h1 {
 			margin: 0 0 12px;
 			font-size: clamp(2.5rem, 9vw, 4.8rem);
 			line-height: 0.95;
-			letter-spacing: 0;
 		}
 		p {
 			margin: 0;
@@ -153,33 +121,8 @@ utilityRoutes.get("/signup", (c) => {
 			gap: 12px;
 			margin-top: 28px;
 		}
-		.button {
-			display: inline-flex;
-			align-items: center;
-			justify-content: center;
+		.actions .button {
 			min-height: 50px;
-			padding: 0 18px;
-			border: 1px solid rgba(255, 255, 255, 0.14);
-			border-radius: 8px;
-			background: rgba(255, 255, 255, 0.06);
-			color: var(--text);
-			font-weight: 800;
-			text-decoration: none;
-		}
-		.button.primary {
-			border-color: transparent;
-			background: var(--text);
-			color: var(--ink);
-		}
-		.button.google {
-			border-color: rgba(142, 230, 177, 0.32);
-			background: rgba(142, 230, 177, 0.09);
-		}
-		.button.disabled {
-			justify-content: center;
-			color: var(--muted);
-			cursor: not-allowed;
-			opacity: 0.72;
 		}
 		.note {
 			margin-top: 18px;
@@ -197,8 +140,7 @@ utilityRoutes.get("/signup", (c) => {
 <body>
 	<main>
 		<a class="brand" href="/">
-			<span class="mark">1H</span>
-			<span>ZorFit_MCP</span>
+			${ZORFIT_BRAND}
 		</a>
 		<h1>Create your ZorFit account.</h1>
 		<p>Choose a sign-in method, then connect your fitness sources from the dashboard.</p>
@@ -206,7 +148,7 @@ utilityRoutes.get("/signup", (c) => {
 			${githubAction}
 			${googleAction}
 		</div>
-		<p class="note">Sign-in options become active after their OAuth client IDs and secrets are configured in Cloudflare.</p>
+		<p class="note">Sign-in activates after the OAuth client IDs and secrets are added to this ZorFit Cloudflare Worker.</p>
 		<a class="back" href="/">Back to homepage</a>
 	</main>
 </body>
@@ -445,38 +387,14 @@ function settingsShell(title: string, body: string): string {
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>${title} - ZorFit_MCP</title>
 	<style>
-		:root {
-			color-scheme: dark;
-			font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-			--bg: #080b10;
-			--panel: #10151f;
-			--panel-2: #151b27;
-			--line: #273142;
-			--text: #f5f7fb;
-			--muted: #aab4c5;
-			--soft: #d7deea;
-			--green: #8ee6b1;
-			--blue: #9db9ff;
-			--amber: #ffd38a;
-			--red: #ffb4b4;
-			--ink: #091019;
-		}
-		* { box-sizing: border-box; }
-		body {
-			margin: 0;
-			color: var(--text);
-			background:
-				radial-gradient(circle at 82% 0%, rgba(157, 185, 255, 0.18), transparent 30rem),
-				linear-gradient(180deg, #0c1119 0%, var(--bg) 46%, #07090d 100%);
-		}
-		a { color: inherit; text-decoration: none; }
+		${ZORFIT_THEME_CSS}
 		.shell { width: min(1120px, calc(100% - 32px)); margin: 0 auto; }
 		nav {
 			position: sticky;
 			top: 0;
 			z-index: 10;
-			border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-			background: rgba(8, 11, 16, 0.82);
+			border-bottom: 1px solid rgba(245, 242, 236, 0.08);
+			background: rgba(10, 10, 10, 0.82);
 			backdrop-filter: blur(18px);
 		}
 		nav .shell {
@@ -486,46 +404,11 @@ function settingsShell(title: string, body: string): string {
 			min-height: 72px;
 			gap: 18px;
 		}
-		.brand {
-			display: inline-flex;
-			align-items: center;
-			gap: 10px;
-			font-weight: 850;
-		}
-		.mark {
-			display: grid;
-			place-items: center;
-			width: 32px;
-			height: 32px;
-			border-radius: 8px;
-			background: linear-gradient(135deg, var(--green), var(--blue));
-			color: var(--ink);
-			font-weight: 900;
-		}
 		.nav-links, .actions {
 			display: flex;
 			align-items: center;
 			flex-wrap: wrap;
 			gap: 10px;
-		}
-		.button, button {
-			display: inline-flex;
-			align-items: center;
-			justify-content: center;
-			min-height: 42px;
-			padding: 0 16px;
-			border: 1px solid rgba(255, 255, 255, 0.14);
-			border-radius: 8px;
-			background: rgba(255, 255, 255, 0.06);
-			color: var(--text);
-			font: inherit;
-			font-weight: 750;
-			white-space: nowrap;
-		}
-		.button.primary, button.primary {
-			border-color: transparent;
-			background: var(--text);
-			color: var(--ink);
 		}
 		button.danger { color: var(--red); }
 		button:disabled { cursor: not-allowed; opacity: 0.52; }
@@ -548,15 +431,14 @@ function settingsShell(title: string, body: string): string {
 			margin: 14px 0 16px;
 			font-size: clamp(3rem, 7vw, 6rem);
 			line-height: 0.9;
-			letter-spacing: 0;
 		}
 		h2, h3 { margin: 0; letter-spacing: 0; }
 		p { color: var(--muted); line-height: 1.65; }
 		.lede { max-width: 680px; margin: 0; font-size: 1.08rem; }
 		.panel, .card {
-			border: 1px solid rgba(255, 255, 255, 0.11);
+			border: 1px solid rgba(245, 242, 236, 0.11);
 			border-radius: 8px;
-			background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
+			background: linear-gradient(180deg, rgba(245, 242, 236, 0.065), rgba(245, 242, 236, 0.03));
 		}
 		.panel { padding: 18px; }
 		.section { margin-top: 30px; }
@@ -597,9 +479,9 @@ function settingsShell(title: string, body: string): string {
 			align-items: center;
 			min-height: 25px;
 			padding: 0 10px;
-			border: 1px solid rgba(255, 255, 255, 0.12);
+			border: 1px solid rgba(245, 242, 236, 0.12);
 			border-radius: 999px;
-			background: rgba(255, 255, 255, 0.05);
+			background: rgba(245, 242, 236, 0.05);
 			color: var(--green);
 			font-size: 0.72rem;
 			font-weight: 820;
@@ -617,9 +499,9 @@ function settingsShell(title: string, body: string): string {
 		input, select, textarea {
 			width: 100%;
 			min-height: 44px;
-			border: 1px solid rgba(255, 255, 255, 0.12);
+			border: 1px solid rgba(245, 242, 236, 0.12);
 			border-radius: 8px;
-			background: rgba(255, 255, 255, 0.06);
+			background: rgba(245, 242, 236, 0.06);
 			color: var(--text);
 			padding: 10px 12px;
 			font: inherit;
@@ -647,9 +529,9 @@ function settingsShell(title: string, body: string): string {
 		.helper {
 			margin-top: 14px;
 			padding: 12px;
-			border: 1px solid rgba(255, 211, 138, 0.22);
+			border: 1px solid rgba(255, 92, 26, 0.28);
 			border-radius: 8px;
-			background: rgba(255, 211, 138, 0.06);
+			background: rgba(255, 92, 26, 0.065);
 			color: var(--muted);
 			font-size: 0.9rem;
 		}
@@ -659,7 +541,7 @@ function settingsShell(title: string, body: string): string {
 		#message { min-height: 24px; margin-top: 14px; color: var(--green); font-weight: 760; }
 		footer {
 			padding: 36px 0;
-			border-top: 1px solid rgba(255, 255, 255, 0.08);
+			border-top: 1px solid rgba(245, 242, 236, 0.08);
 			color: var(--muted);
 		}
 		footer .shell {
@@ -679,19 +561,18 @@ function settingsShell(title: string, body: string): string {
 	<nav>
 		<div class="shell">
 			<a class="brand" href="/">
-				<span class="mark">1H</span>
-				<span>ZorFit_MCP</span>
+				${ZORFIT_BRAND}
 			</a>
 			<div class="nav-links">
 				<a class="button" href="/settings">Settings</a>
-				<a class="button" href="/connections">Classic connections</a>
+				<a class="button" href="/connections">Connections</a>
 			</div>
 		</div>
 	</nav>
 	${body}
 	<footer>
 		<div class="shell">
-			<span>ZorFit_MCP settings</span>
+			<span>ZorFit settings</span>
 			<span>Credentials are encrypted when active saving is enabled.</span>
 		</div>
 	</footer>
@@ -1842,8 +1723,7 @@ utilityRoutes.get("/settings-old", (c) => {
 	<nav>
 		<div class="shell">
 			<a class="brand" href="/">
-				<span class="mark">1H</span>
-				<span>ZorFit_MCP</span>
+				${ZORFIT_BRAND}
 			</a>
 			<div class="nav-links" aria-label="Settings navigation">
 				<a class="button" href="/connections">Connections</a>
@@ -1979,7 +1859,7 @@ utilityRoutes.get("/settings-old", (c) => {
 
 	<footer>
 		<div class="shell">
-			<span>ZorFit_MCP settings</span>
+			<span>ZorFit settings</span>
 			<span>Secrets will be encrypted before active storage is enabled.</span>
 		</div>
 	</footer>

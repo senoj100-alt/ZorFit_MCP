@@ -3,6 +3,8 @@
  * Handles approval dialogs and client approval tracking
  */
 
+import { ZORFIT_BRAND, ZORFIT_THEME_CSS } from "./lib/zorfit-theme.js";
+
 /**
  * Renders the OAuth approval dialog HTML
  * Shown to users when authorizing a new OAuth client
@@ -35,43 +37,14 @@ export function renderApprovalDialog(params: {
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Authorize ZorFit_MCP</title>
 	<style>
-		* {
-			margin: 0;
-			padding: 0;
-			box-sizing: border-box;
-		}
+		${ZORFIT_THEME_CSS}
 		:root {
-			color-scheme: dark;
-			--bg: #05070a;
-			--panel: rgba(14, 22, 30, 0.94);
-			--panel-soft: rgba(255, 255, 255, 0.06);
-			--line: rgba(255, 255, 255, 0.13);
-			--text: #f4f7f2;
-			--muted: #a5b1aa;
-			--soft: #d7e0d7;
-			--green: #98f5bd;
-			--green-strong: #44d783;
-			--amber: #f4d37d;
-			--red: #ff9a9a;
+			--panel-soft: rgba(245, 242, 236, 0.06);
 			--shadow: rgba(0, 0, 0, 0.38);
 		}
 		body {
-			font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-			background:
-				radial-gradient(circle at 18% 8%, rgba(68, 215, 131, 0.16), transparent 28rem),
-				linear-gradient(145deg, #05070a 0%, #101a16 52%, #060b0d 100%);
-			color: var(--text);
 			min-height: 100vh;
 			padding: 32px 18px;
-		}
-		body::before {
-			content: "";
-			position: fixed;
-			inset: 0;
-			pointer-events: none;
-			background-image: linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-			background-size: 100% 44px;
-			mask-image: linear-gradient(to bottom, black, transparent 72%);
 		}
 		.container {
 			position: relative;
@@ -89,24 +62,7 @@ export function renderApprovalDialog(params: {
 			gap: 12px;
 			margin-bottom: 26px;
 		}
-		.logo {
-			width: 44px;
-			height: 44px;
-			border: 1px solid rgba(152, 245, 189, 0.45);
-			border-radius: 12px;
-			display: grid;
-			place-items: center;
-			background: rgba(152, 245, 189, 0.1);
-			color: var(--green);
-			font-weight: 800;
-		}
-		.brand strong {
-			display: block;
-			font-size: 15px;
-			letter-spacing: 0.04em;
-			text-transform: uppercase;
-		}
-		.brand span {
+		.brand-subtitle {
 			color: var(--muted);
 			display: block;
 			font-size: 13px;
@@ -125,7 +81,7 @@ export function renderApprovalDialog(params: {
 			max-width: 610px;
 		}
 		.panel {
-			background: var(--panel);
+			background: linear-gradient(180deg, rgba(245, 242, 236, 0.07), rgba(245, 242, 236, 0.035));
 			border: 1px solid var(--line);
 			border-radius: 8px;
 			box-shadow: 0 26px 80px var(--shadow);
@@ -157,7 +113,7 @@ export function renderApprovalDialog(params: {
 			margin-bottom: 2px;
 		}
 		.permission-item {
-			background: rgba(255, 255, 255, 0.045);
+			background: rgba(245, 242, 236, 0.045);
 			border: 1px solid var(--line);
 			padding: 14px;
 			border-radius: 8px;
@@ -173,8 +129,8 @@ export function renderApprovalDialog(params: {
 			margin-bottom: 4px;
 		}
 		.client-info {
-			background: rgba(244, 211, 125, 0.08);
-			border: 1px solid rgba(244, 211, 125, 0.22);
+			background: rgba(255, 92, 26, 0.08);
+			border: 1px solid rgba(255, 92, 26, 0.24);
 			padding: 14px;
 			margin: 16px 0 20px;
 			border-radius: 8px;
@@ -250,11 +206,8 @@ export function renderApprovalDialog(params: {
 	<div class="container">
 		<div class="header">
 			<div class="brand">
-				<div class="logo">1H</div>
-				<div>
-					<strong>ZorFit_MCP</strong>
-					<span>Private health context for AI agents</span>
-				</div>
+				${ZORFIT_BRAND}
+				<span class="brand-subtitle">Private health context for AI agents</span>
 			</div>
 			<h1>Connect ZorFit_MCP to Claude.</h1>
 			<p>Claude is asking permission to use your ZorFit MCP endpoint. Approving lets Claude read the fitness sources you connect, then answer questions using your workouts, nutrition, sleep, recovery, and activity context.</p>

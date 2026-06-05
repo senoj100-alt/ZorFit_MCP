@@ -34,6 +34,7 @@ import {
 	type ServiceAuthType,
 } from "./lib/service-connections.js";
 import { getZorFitServiceStatuses } from "./lib/service-registry.js";
+import { ZORFIT_BRAND, ZORFIT_THEME_CSS } from "./lib/zorfit-theme.js";
 
 interface Env {
 	OAUTH_KV: KVNamespace;
@@ -115,56 +116,44 @@ function renderAuthSetupPage(provider: string, missing: string[]): string {
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>${provider} login setup required - ZorFit_MCP</title>
 	<style>
-		:root {
-			color-scheme: dark;
-			font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-			--bg: #080b10;
-			--panel: #10151f;
-			--line: #273142;
-			--text: #f5f7fb;
-			--muted: #aab4c5;
-			--green: #8ee6b1;
-		}
-		* { box-sizing: border-box; }
+		${ZORFIT_THEME_CSS}
 		body {
-			margin: 0;
 			min-height: 100vh;
 			display: grid;
 			place-items: center;
 			padding: 24px;
-			background: linear-gradient(180deg, #0c1119 0%, var(--bg) 100%);
-			color: var(--text);
 		}
 		main {
-			width: min(560px, 100%);
-			padding: 28px;
-			border: 1px solid rgba(255, 255, 255, 0.12);
+			width: min(620px, 100%);
+			padding: 30px;
+			border: 1px solid rgba(245, 242, 236, 0.12);
 			border-radius: 8px;
-			background: var(--panel);
+			background: linear-gradient(180deg, rgba(245, 242, 236, 0.07), rgba(245, 242, 236, 0.035));
 		}
-		h1 { margin: 0 0 12px; font-size: clamp(2rem, 7vw, 3rem); line-height: 1; }
+		.brand { margin-bottom: 26px; }
+		h1 { margin: 0 0 12px; font-size: clamp(2.5rem, 9vw, 4.6rem); line-height: 0.92; }
 		p, li { color: var(--muted); line-height: 1.6; }
 		code {
 			padding: 3px 7px;
-			border: 1px solid rgba(255, 255, 255, 0.1);
+			border: 1px solid rgba(245, 242, 236, 0.12);
 			border-radius: 6px;
-			background: rgba(255, 255, 255, 0.08);
+			background: rgba(245, 242, 236, 0.08);
 			color: var(--green);
 		}
-		a {
-			color: var(--green);
-			font-weight: 750;
-			text-decoration: none;
-		}
+		.actions { margin-top: 22px; }
 	</style>
 </head>
 <body>
 	<main>
+		<a class="brand" href="/">${ZORFIT_BRAND}</a>
 		<h1>${provider} login needs setup.</h1>
-		<p>This login option is built into ZorFit_MCP, but the production OAuth secrets have not been configured yet.</p>
+		<p>This sign-in option is built into ZorFit, but the production OAuth secrets have not been configured yet.</p>
 		<p>Missing Cloudflare secrets:</p>
 		<ul>${missingItems}</ul>
-		<p><a href="/">Return home</a></p>
+		<div class="actions">
+			<a class="button primary" href="/">Return home</a>
+			<a class="button" href="/signup">Back to sign in</a>
+		</div>
 	</main>
 </body>
 </html>`;
@@ -846,39 +835,7 @@ app.get("/connections", async (c) => {
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 	<title>ZorFit_MCP Connections</title>
 	<style>
-		:root {
-			color-scheme: dark;
-			font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-			--bg: #080b10;
-			--panel: #10151f;
-			--panel-2: #151b27;
-			--line: #273142;
-			--text: #f5f7fb;
-			--muted: #aab4c5;
-			--soft: #d7deea;
-			--green: #8ee6b1;
-			--blue: #9db9ff;
-			--amber: #ffd38a;
-			--red: #ffb4b4;
-			--ink: #091019;
-		}
-
-		* {
-			box-sizing: border-box;
-		}
-
-		body {
-			margin: 0;
-			color: var(--text);
-			background:
-				radial-gradient(circle at 78% 0%, rgba(157, 185, 255, 0.18), transparent 31rem),
-				linear-gradient(180deg, #0c1119 0%, var(--bg) 46%, #07090d 100%);
-		}
-
-		a {
-			color: inherit;
-			text-decoration: none;
-		}
+		${ZORFIT_THEME_CSS}
 
 		.shell {
 			width: min(1180px, calc(100% - 32px));
@@ -906,10 +863,10 @@ app.get("/connections", async (c) => {
 			align-items: center;
 			min-height: 24px;
 			padding: 0 10px;
-			border: 1px solid rgba(255, 255, 255, 0.12);
+			border: 1px solid rgba(200, 245, 66, 0.28);
 			border-radius: 999px;
 			color: var(--green);
-			background: rgba(142, 230, 177, 0.08);
+			background: rgba(200, 245, 66, 0.08);
 			font-size: 0.76rem;
 			font-weight: 780;
 			letter-spacing: 0.08em;
@@ -921,8 +878,8 @@ app.get("/connections", async (c) => {
 			position: sticky;
 			top: 0;
 			z-index: 10;
-			border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-			background: rgba(8, 11, 16, 0.78);
+			border-bottom: 1px solid rgba(245, 242, 236, 0.08);
+			background: rgba(10, 10, 10, 0.78);
 			backdrop-filter: blur(18px);
 		}
 
@@ -934,26 +891,6 @@ app.get("/connections", async (c) => {
 			gap: 18px;
 		}
 
-		.brand {
-			display: inline-flex;
-			align-items: center;
-			gap: 10px;
-			font-weight: 850;
-			letter-spacing: 0;
-		}
-
-		.mark {
-			display: grid;
-			place-items: center;
-			width: 32px;
-			height: 32px;
-			border: 1px solid rgba(255, 255, 255, 0.18);
-			border-radius: 8px;
-			background: linear-gradient(135deg, var(--green), var(--blue));
-			color: var(--ink);
-			font-weight: 900;
-		}
-
 		.nav-actions {
 			display: flex;
 			align-items: center;
@@ -961,25 +898,9 @@ app.get("/connections", async (c) => {
 		}
 
 		.button, button {
-			display: inline-flex;
-			align-items: center;
-			justify-content: center;
 			min-height: 40px;
 			padding: 0 14px;
-			border: 1px solid rgba(255, 255, 255, 0.14);
-			border-radius: 8px;
-			background: rgba(255, 255, 255, 0.06);
-			color: var(--text);
-			font: inherit;
 			font-weight: 760;
-			cursor: pointer;
-			white-space: nowrap;
-		}
-
-		.button.primary, button.primary {
-			border-color: transparent;
-			background: var(--text);
-			color: var(--ink);
 		}
 
 		button.danger {
@@ -1001,15 +922,7 @@ app.get("/connections", async (c) => {
 			gap: 24px;
 			align-items: end;
 			padding-bottom: 30px;
-			border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-		}
-
-		.eyebrow {
-			color: var(--green);
-			font-size: 0.76rem;
-			font-weight: 820;
-			letter-spacing: 0.12em;
-			text-transform: uppercase;
+			border-bottom: 1px solid rgba(245, 242, 236, 0.1);
 		}
 
 		h1 {
@@ -1017,12 +930,10 @@ app.get("/connections", async (c) => {
 			margin: 12px 0 12px;
 			font-size: clamp(2.7rem, 7vw, 5.6rem);
 			line-height: 0.92;
-			letter-spacing: 0;
 		}
 
 		h2, h3 {
 			margin: 0;
-			letter-spacing: 0;
 		}
 
 		p {
@@ -1045,9 +956,9 @@ app.get("/connections", async (c) => {
 
 		.summary-card {
 			padding: 16px;
-			border: 1px solid rgba(255, 255, 255, 0.1);
+			border: 1px solid rgba(245, 242, 236, 0.1);
 			border-radius: 8px;
-			background: rgba(255, 255, 255, 0.04);
+			background: rgba(245, 242, 236, 0.04);
 		}
 
 		.summary-card strong {
@@ -1068,9 +979,9 @@ app.get("/connections", async (c) => {
 			flex-direction: column;
 			min-height: 430px;
 			padding: 20px;
-			border: 1px solid rgba(255, 255, 255, 0.1);
+			border: 1px solid rgba(245, 242, 236, 0.1);
 			border-radius: 8px;
-			background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
+			background: linear-gradient(180deg, rgba(245, 242, 236, 0.065), rgba(245, 242, 236, 0.03));
 		}
 
 		.card-top {
@@ -1086,10 +997,10 @@ app.get("/connections", async (c) => {
 			align-items: center;
 			min-height: 24px;
 			padding: 0 9px;
-			border: 1px solid rgba(255, 255, 255, 0.12);
+			border: 1px solid rgba(245, 242, 236, 0.12);
 			border-radius: 999px;
 			color: var(--muted);
-			background: rgba(255, 255, 255, 0.04);
+			background: rgba(245, 242, 236, 0.04);
 			font-size: 0.68rem;
 			font-weight: 820;
 			letter-spacing: 0.08em;
@@ -1099,12 +1010,12 @@ app.get("/connections", async (c) => {
 
 		.status.configured {
 			color: var(--green);
-			background: rgba(142, 230, 177, 0.08);
+			background: rgba(200, 245, 66, 0.08);
 		}
 
 		.status.server {
-			color: var(--blue);
-			background: rgba(157, 185, 255, 0.1);
+			color: var(--amber);
+			background: rgba(255, 92, 26, 0.1);
 		}
 
 		.note {
@@ -1114,9 +1025,9 @@ app.get("/connections", async (c) => {
 
 		.help {
 			padding: 12px;
-			border: 1px solid rgba(255, 255, 255, 0.1);
+			border: 1px solid rgba(245, 242, 236, 0.1);
 			border-radius: 8px;
-			background: rgba(8, 11, 16, 0.5);
+			background: rgba(245, 242, 236, 0.04);
 		}
 
 		.help p {
@@ -1142,9 +1053,9 @@ app.get("/connections", async (c) => {
 			width: 100%;
 			margin-top: 6px;
 			padding: 11px 12px;
-			border: 1px solid rgba(255, 255, 255, 0.12);
+			border: 1px solid rgba(245, 242, 236, 0.12);
 			border-radius: 8px;
-			background: rgba(8, 11, 16, 0.72);
+			background: rgba(245, 242, 236, 0.06);
 			color: var(--text);
 			font: inherit;
 		}
@@ -1191,8 +1102,7 @@ app.get("/connections", async (c) => {
 	<nav>
 		<div class="shell">
 			<a class="brand" href="/">
-				<span class="mark">1H</span>
-				<span>ZorFit_MCP</span>
+				${ZORFIT_BRAND}
 			</a>
 			<div class="nav-actions">
 				<a class="button" href="/">Home</a>
@@ -1205,7 +1115,7 @@ app.get("/connections", async (c) => {
 		<header>
 			<div>
 				<span class="eyebrow">Service dashboard</span>
-				<h1>ZorFit_MCP Connections</h1>
+				<h1>ZorFit Connections</h1>
 				<p class="lede">Connect personal health and fitness services for @${session.login}. Per-user tokens are encrypted in D1; server-level credentials appear as connected for every signed-in user.</p>
 			</div>
 			<div class="summary" aria-label="Connection summary">
@@ -1512,41 +1422,35 @@ app.get("/setup", async (c) => {
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Hevy API Key Setup</title>
+	<title>Hevy API Key Setup - ZorFit</title>
 	<style>
-		* {
-			margin: 0;
-			padding: 0;
-			box-sizing: border-box;
-		}
-
+		${ZORFIT_THEME_CSS}
 		body {
-			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 			min-height: 100vh;
-			display: flex;
-			align-items: center;
-			justify-content: center;
+			display: grid;
+			place-items: center;
 			padding: 20px;
 		}
 
 		.container {
-			background: white;
-			border-radius: 12px;
-			box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-			max-width: 600px;
+			max-width: 680px;
 			width: 100%;
-			padding: 40px;
+			padding: 30px;
+			border: 1px solid rgba(245, 242, 236, 0.12);
+			border-radius: 8px;
+			background: linear-gradient(180deg, rgba(245, 242, 236, 0.07), rgba(245, 242, 236, 0.035));
+			box-shadow: 0 26px 80px rgba(0, 0, 0, 0.38);
 		}
 
 		h1 {
-			color: #333;
-			margin-bottom: 10px;
-			font-size: 28px;
+			margin: 24px 0 14px;
+			font-size: clamp(2.6rem, 9vw, 4.8rem);
+			line-height: 0.92;
 		}
 
 		.user-info {
-			background: #f8f9fa;
+			background: rgba(245, 242, 236, 0.055);
+			border: 1px solid rgba(245, 242, 236, 0.1);
 			padding: 15px;
 			border-radius: 8px;
 			margin-bottom: 30px;
@@ -1567,27 +1471,23 @@ app.get("/setup", async (c) => {
 
 		.user-name {
 			font-weight: 600;
-			color: #333;
+			color: var(--text);
 		}
 
 		.user-login {
 			font-size: 14px;
-			color: #666;
+			color: var(--muted);
 		}
 
 		.logout-btn {
-			background: #dc3545;
-			color: white;
-			border: none;
+			border: 1px solid rgba(245, 242, 236, 0.14);
+			background: rgba(245, 242, 236, 0.06);
+			color: var(--text);
 			padding: 6px 12px;
-			border-radius: 4px;
+			border-radius: 8px;
 			font-size: 14px;
 			cursor: pointer;
 			text-decoration: none;
-		}
-
-		.logout-btn:hover {
-			background: #c82333;
 		}
 
 		.status {
@@ -1600,56 +1500,50 @@ app.get("/setup", async (c) => {
 		}
 
 		.status.configured {
-			background: #d4edda;
-			color: #155724;
-			border: 1px solid #c3e6cb;
+			background: rgba(200, 245, 66, 0.08);
+			color: var(--green);
+			border: 1px solid rgba(200, 245, 66, 0.28);
 		}
 
 		.status.not-configured {
-			background: #fff3cd;
-			color: #856404;
-			border: 1px solid #ffeaa7;
-		}
-
-		.status-icon {
-			font-size: 24px;
+			background: rgba(255, 92, 26, 0.08);
+			color: var(--amber);
+			border: 1px solid rgba(255, 92, 26, 0.28);
 		}
 
 		label {
 			display: block;
 			font-weight: 600;
 			margin-bottom: 8px;
-			color: #333;
+			color: var(--soft);
 		}
 
 		.help-text {
 			font-size: 14px;
-			color: #666;
+			color: var(--muted);
 			margin-bottom: 8px;
 		}
 
 		.help-text a {
-			color: #667eea;
+			color: var(--green);
 			text-decoration: none;
-		}
-
-		.help-text a:hover {
-			text-decoration: underline;
 		}
 
 		input[type="text"] {
 			width: 100%;
 			padding: 12px;
-			border: 2px solid #e0e0e0;
-			border-radius: 6px;
+			border: 1px solid rgba(245, 242, 236, 0.12);
+			border-radius: 8px;
+			background: rgba(245, 242, 236, 0.06);
+			color: var(--text);
 			font-size: 14px;
-			font-family: monospace;
+			font-family: "Space Mono", monospace;
 			transition: border-color 0.2s;
 		}
 
 		input[type="text"]:focus {
 			outline: none;
-			border-color: #667eea;
+			border-color: var(--green);
 		}
 
 		.button-group {
@@ -1661,40 +1555,14 @@ app.get("/setup", async (c) => {
 		button {
 			flex: 1;
 			padding: 12px 24px;
-			border: none;
-			border-radius: 6px;
+			border-radius: 8px;
 			font-size: 16px;
 			font-weight: 600;
-			cursor: pointer;
 			transition: all 0.2s;
 		}
 
-		.btn-primary {
-			background: #667eea;
-			color: white;
-		}
-
-		.btn-primary:hover:not(:disabled) {
-			background: #5568d3;
-		}
-
-		.btn-secondary {
-			background: #6c757d;
-			color: white;
-		}
-
-		.btn-secondary:hover:not(:disabled) {
-			background: #5a6268;
-		}
-
-		.btn-danger {
-			background: #dc3545;
-			color: white;
-		}
-
-		.btn-danger:hover:not(:disabled) {
-			background: #c82333;
-		}
+		.btn-primary { background: var(--green); color: var(--ink); border-color: var(--green); }
+		.btn-danger { color: var(--red); }
 
 		button:disabled {
 			opacity: 0.6;
@@ -1709,26 +1577,26 @@ app.get("/setup", async (c) => {
 		}
 
 		.message.success {
-			background: #d4edda;
-			color: #155724;
-			border: 1px solid #c3e6cb;
+			background: rgba(200, 245, 66, 0.08);
+			color: var(--green);
+			border: 1px solid rgba(200, 245, 66, 0.28);
 		}
 
 		.message.error {
-			background: #f8d7da;
-			color: #721c24;
-			border: 1px solid #f5c6cb;
+			background: rgba(255, 120, 77, 0.08);
+			color: var(--red);
+			border: 1px solid rgba(255, 120, 77, 0.28);
 		}
 
 		.message.info {
-			background: #d1ecf1;
-			color: #0c5460;
-			border: 1px solid #bee5eb;
+			background: rgba(245, 242, 236, 0.055);
+			color: var(--soft);
+			border: 1px solid rgba(245, 242, 236, 0.12);
 		}
 
 		.spinner {
-			border: 3px solid #f3f3f3;
-			border-top: 3px solid #667eea;
+			border: 3px solid rgba(245, 242, 236, 0.18);
+			border-top: 3px solid var(--green);
 			border-radius: 50%;
 			width: 20px;
 			height: 20px;
@@ -1745,7 +1613,8 @@ app.get("/setup", async (c) => {
 </head>
 <body>
 	<div class="container">
-		<h1>🏋️ Hevy API Key Setup</h1>
+		<a class="brand" href="/">${ZORFIT_BRAND}</a>
+		<h1>Hevy API Key Setup</h1>
 		
 		<div class="user-info">
 			<div class="user-details">
@@ -1756,7 +1625,6 @@ app.get("/setup", async (c) => {
 		</div>
 
 		<div class="status ${hasApiKey ? "configured" : "not-configured"}">
-			<span class="status-icon">${hasApiKey ? "✅" : "⚠️"}</span>
 			<div>
 				<strong>${hasApiKey ? "API Key Configured" : "API Key Not Configured"}</strong>
 				<div style="font-size: 14px; margin-top: 4px;">
@@ -1787,7 +1655,7 @@ app.get("/setup", async (c) => {
 		</form>
 
 		${hasApiKey ? `
-		<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+		<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(245, 242, 236, 0.1);">
 			<button id="deleteBtn" class="btn-danger" style="width: 100%;">Delete API Key</button>
 		</div>
 		` : ""}
