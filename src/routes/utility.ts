@@ -28,6 +28,7 @@ import {
 	upsertUserMessageSchedule,
 	upsertNotificationSchedule,
 	upsertTelegramConnection,
+	type UserMessageSchedule,
 } from "../lib/notifications.js";
 import {
 	HEALTH_CATEGORIES,
@@ -37,6 +38,9 @@ import {
 	normalizeHealthCategories,
 	questionBankForCategories,
 	upsertDataPreferences,
+	type CategoryContext,
+	type HealthContextBundle,
+	type HealthDataCategory,
 } from "../lib/data-routing.js";
 import { sendTestNutritionInsight } from "../lib/scheduled-nutrition.js";
 import { getZorFitServiceStatuses } from "../lib/service-registry.js";
@@ -672,6 +676,106 @@ function settingsShell(title: string, body: string): string {
 			justify-self: end;
 			background: rgba(180, 255, 44, 0.12);
 		}
+		.score-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+			gap: 14px;
+		}
+		.score-card {
+			padding: 16px;
+			min-height: 150px;
+		}
+		.score-card strong {
+			display: block;
+			color: var(--muted);
+			font-size: 0.78rem;
+			font-weight: 820;
+			letter-spacing: 0.1em;
+			text-transform: uppercase;
+		}
+		.score-value {
+			margin-top: 14px;
+			color: var(--green);
+			font-size: 2.8rem;
+			font-weight: 920;
+			line-height: 0.9;
+		}
+		.score-card p { margin: 12px 0 0; font-size: 0.9rem; }
+		.motivation {
+			margin-top: 18px;
+			padding: 18px;
+			border: 1px solid rgba(180, 255, 44, 0.24);
+			border-radius: 8px;
+			background: rgba(180, 255, 44, 0.075);
+		}
+		.motivation h3 { margin-bottom: 8px; }
+		.motivation p { margin: 0; }
+		.timeline {
+			position: relative;
+			display: grid;
+			gap: 18px;
+			margin-top: 20px;
+			padding: 4px 0;
+		}
+		.timeline::before {
+			content: "";
+			position: absolute;
+			left: 10px;
+			top: 10px;
+			bottom: 10px;
+			width: 2px;
+			background: rgba(245, 242, 236, 0.14);
+		}
+		.timeline-item {
+			position: relative;
+			padding-left: 36px;
+		}
+		.timeline-dot {
+			position: absolute;
+			left: 4px;
+			top: 5px;
+			width: 14px;
+			height: 14px;
+			border: 2px solid #0a0a0a;
+			border-radius: 999px;
+			background: var(--green);
+			box-shadow: 0 0 0 3px rgba(180, 255, 44, 0.14);
+		}
+		.timeline-dot.pending {
+			background: var(--orange);
+			box-shadow: 0 0 0 3px rgba(255, 92, 26, 0.13);
+		}
+		.timeline-dot.empty {
+			background: rgba(245, 242, 236, 0.45);
+			box-shadow: none;
+		}
+		.timeline-time {
+			color: var(--green);
+			font-size: 0.76rem;
+			font-weight: 840;
+			letter-spacing: 0.1em;
+			text-transform: uppercase;
+		}
+		.timeline-title {
+			margin: 3px 0 5px;
+			color: var(--text);
+			font-size: 1.05rem;
+			font-weight: 860;
+		}
+		.timeline-summary {
+			margin: 0;
+			color: var(--muted);
+			line-height: 1.55;
+		}
+		.timeline-badge {
+			display: inline-flex;
+			margin-left: 8px;
+			color: var(--muted);
+			font-size: 0.7rem;
+			font-weight: 820;
+			letter-spacing: 0.08em;
+			text-transform: uppercase;
+		}
 		#message { min-height: 24px; margin-top: 14px; color: var(--green); font-weight: 760; }
 		footer {
 			padding: 36px 0;
@@ -698,6 +802,7 @@ function settingsShell(title: string, body: string): string {
 				${ZORFIT_BRAND}
 			</a>
 			<div class="nav-links">
+				<a class="button" href="/my-day">My day</a>
 				<a class="button" href="/settings">Settings</a>
 				<a class="button" href="/connections">Connections</a>
 				<a class="button" href="/coach">Coach chat</a>
@@ -837,6 +942,234 @@ function localDateForTimezone(timezone: string, now = new Date()): string {
 	const get = (type: string) =>
 		parts.find((part) => part.type === type)?.value ?? "";
 	return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+function localDateTimeForTimezone(
+	timezone: string,
+	now = new Date(),
+): { date: string; time: string } {
+	const parts = new Intl.DateTimeFormat("en-CA", {
+		timeZone: normalizeTimezone(timezone),
+		year: "numeric",
+		month: "2-digit",
+		day: "2-digit",
+		hour: "2-digit",
+		minute: "2-digit",
+		hourCycle: "h23",
+	}).formatToParts(now);
+	const get = (type: string) =>
+		parts.find((part) => part.type === type)?.value ?? "";
+	return {
+		date: `${get("year")}-${get("month")}-${get("day")}`,
+		time: `${get("hour")}:${get("minute")}`,
+	};
+}
+
+function minutesFromTime(time: string): number {
+	const [hour, minute] = time.split(":").map(Number);
+	if (!Number.isFinite(hour) || !Number.isFinite(minute)) return 0;
+	return hour * 60 + minute;
+}
+
+function categoryLabel(category: string): string {
+	return (
+		HEALTH_CATEGORIES.find((item) => item.id === category)?.label ??
+		category.replace(/_/g, " ")
+	);
+}
+
+function configuredCategories(
+	schedules: UserMessageSchedule[],
+): HealthDataCategory[] {
+	const selected = schedules.flatMap((schedule) => schedule.categories);
+	const known = selected.filter((category): category is HealthDataCategory =>
+		HEALTH_CATEGORIES.some((item) => item.id === category),
+	);
+	return Array.from(
+		new Set([
+			...known,
+			"nutrition",
+			"hrv",
+			"sleep",
+			"fitness_activities",
+			"gym_workouts",
+			"steps",
+			"recovery",
+		] satisfies HealthDataCategory[]),
+	);
+}
+
+function contextFor(
+	context: HealthContextBundle,
+	category: HealthDataCategory,
+): CategoryContext | undefined {
+	return context.categories.find((item) => item.category === category);
+}
+
+function hasReadyData(context: HealthContextBundle, categories: HealthDataCategory[]): boolean {
+	return categories.some((category) => contextFor(context, category)?.status === "ready");
+}
+
+function scoreBand(score: number): string {
+	if (score >= 85) return "Strong";
+	if (score >= 70) return "On track";
+	if (score >= 55) return "Needs attention";
+	return "Set up data";
+}
+
+function boundedScore(score: number): number {
+	return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+function safeRecord(value: unknown): Record<string, unknown> | null {
+	return value && typeof value === "object" && !Array.isArray(value)
+		? (value as Record<string, unknown>)
+		: null;
+}
+
+function numberFrom(value: unknown): number | undefined {
+	if (typeof value === "number" && Number.isFinite(value)) return value;
+	if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) {
+		return Number(value);
+	}
+	return undefined;
+}
+
+function nutritionMacroLine(context: HealthContextBundle): string | null {
+	const nutrition = contextFor(context, "nutrition");
+	const data = safeRecord(nutrition?.data);
+	const macros = safeRecord(data?.macroSummary);
+	if (!macros) return null;
+	const calories = numberFrom(macros.calories_kcal);
+	const protein = numberFrom(macros.protein_g);
+	const carbs = numberFrom(macros.carbs_g);
+	const fat = numberFrom(macros.fat_g);
+	const sugar = numberFrom(macros.sugar_g);
+	const parts = [
+		calories !== undefined ? `${Math.round(calories)} kcal` : "",
+		protein !== undefined ? `${Math.round(protein)}g protein` : "",
+		carbs !== undefined ? `${Math.round(carbs)}g carbs` : "",
+		fat !== undefined ? `${Math.round(fat)}g fat` : "",
+		sugar !== undefined ? `${Math.round(sugar)}g sugar` : "",
+	].filter(Boolean);
+	return parts.length ? parts.join(" · ") : null;
+}
+
+function scoreSummary(context: HealthContextBundle): {
+	overall: number;
+	nutrition: number;
+	readiness: number;
+	fitness: number;
+} {
+	const nutrition = contextFor(context, "nutrition");
+	const macroLine = nutritionMacroLine(context);
+	const nutritionScore =
+		nutrition?.status === "ready" ? (macroLine ? 82 : 68) : nutrition ? 48 : 42;
+	const recoveryReady = hasReadyData(context, ["hrv", "sleep", "recovery"]);
+	const hrvReady = contextFor(context, "hrv")?.status === "ready";
+	const sleepReady = contextFor(context, "sleep")?.status === "ready";
+	const readinessScore = recoveryReady
+		? hrvReady && sleepReady
+			? 84
+			: 74
+		: 52;
+	const fitnessReady = hasReadyData(context, [
+		"fitness_activities",
+		"gym_workouts",
+		"steps",
+	]);
+	const fitnessScore = fitnessReady ? 78 : 55;
+	return {
+		nutrition: boundedScore(nutritionScore),
+		readiness: boundedScore(readinessScore),
+		fitness: boundedScore(fitnessScore),
+		overall: boundedScore((nutritionScore + readinessScore + fitnessScore) / 3),
+	};
+}
+
+function motivationalMessage(scores: ReturnType<typeof scoreSummary>): string {
+	if (scores.overall >= 80) {
+		return "You are stacking good signals today. Keep the next decision simple: fuel well, move with intent, and protect tonight's sleep.";
+	}
+	if (scores.overall >= 65) {
+		return "Today is still very steerable. One solid meal, one focused training choice, and one clean recovery habit can move the whole day up.";
+	}
+	return "No panic, just precision. Tighten the next four hours: hydrate, get protein in, take an easy walk, and make the next log count.";
+}
+
+interface MyDayTimelineItem {
+	time: string;
+	title: string;
+	summary: string;
+	status: "sent" | "pending" | "empty";
+}
+
+function timelineSummaryFor(schedule: UserMessageSchedule, sent: boolean): string {
+	const categories = schedule.categories.length
+		? schedule.categories.map(categoryLabel).join(", ")
+		: "selected health data";
+	const question = schedule.question
+		? ` Question: ${schedule.question}`
+		: "";
+	return `${sent ? "Sent" : "Scheduled"} using ${categories}.${question}`;
+}
+
+function buildMyDayTimeline(
+	schedules: UserMessageSchedule[],
+	date: string,
+	currentTime: string,
+): MyDayTimelineItem[] {
+	const currentMinutes = minutesFromTime(currentTime);
+	const items = schedules
+		.filter((schedule) => schedule.enabled)
+		.flatMap((schedule) =>
+			schedule.times
+				.filter((time) => minutesFromTime(time) <= currentMinutes)
+				.map((time) => {
+					const slotKey = `${schedule.id}:${date}:${time}`;
+					const sent = Boolean(schedule.lastSent[slotKey]);
+					return {
+						time,
+						title: schedule.title || "ZorFit insight",
+						summary: timelineSummaryFor(schedule, sent),
+						status: sent ? "sent" : "pending",
+					} satisfies MyDayTimelineItem;
+				}),
+		)
+		.sort((a, b) => minutesFromTime(a.time) - minutesFromTime(b.time));
+	if (items.length) return items;
+	return [
+		{
+			time: currentTime,
+			title: "Your day starts here",
+			summary:
+				"Create scheduled messages in Settings to turn morning briefs, meals, workouts, and recovery check-ins into this timeline.",
+			status: "empty",
+		},
+	];
+}
+
+function renderScoreCard(label: string, score: number): string {
+	return `<article class="panel score-card">
+		<strong>${escapeHtml(label)}</strong>
+		<div class="score-value">${score}</div>
+		<p>${escapeHtml(scoreBand(score))}</p>
+	</article>`;
+}
+
+function renderTimelineItem(item: MyDayTimelineItem): string {
+	const badge =
+		item.status === "sent"
+			? "sent"
+			: item.status === "pending"
+				? "pending"
+				: "setup";
+	return `<article class="timeline-item">
+		<span class="timeline-dot ${item.status}"></span>
+		<div class="timeline-time">${escapeHtml(item.time)}<span class="timeline-badge">${badge}</span></div>
+		<h3 class="timeline-title">${escapeHtml(item.title)}</h3>
+		<p class="timeline-summary">${escapeHtml(item.summary)}</p>
+	</article>`;
 }
 
 const AI_PROVIDER_DEFAULTS: Record<
@@ -1886,6 +2219,96 @@ utilityRoutes.get("/coach", async (c) => {
 		refreshBank();
 	</script>`;
 	return c.html(settingsShell("Coach Chat", body));
+});
+
+utilityRoutes.get("/my-day", async (c) => {
+	const session = await getSettingsSession(c);
+	if (!session) {
+		const body = `<main class="shell">
+			<section class="hero">
+				<div>
+					<span class="eyebrow">My day so far</span>
+					<h1>Your day becomes a timeline.</h1>
+					<p class="lede">Sign in to see message check-ins, nutrition notes, recovery signals, and workout moments in one running view.</p>
+				</div>
+				<div class="panel">
+					<strong>Sign in required</strong>
+					<p>Use Google or GitHub sign-in, then configure your message schedule.</p>
+					<a class="button primary" href="/signin">Sign in</a>
+				</div>
+			</section>
+		</main>`;
+		return c.html(settingsShell("My Day So Far", body));
+	}
+
+	const schedules = await listUserMessageSchedules(c.env, session);
+	const timezone = normalizeTimezone(
+		c.req.query("timezone") || schedules[0]?.timezone || "America/New_York",
+	);
+	const local = localDateTimeForTimezone(timezone);
+	const categories = configuredCategories(schedules);
+	const context = await collectHealthContext(c.env, session, {
+		categories,
+		timezone,
+		date: local.date,
+	});
+	const scores = scoreSummary(context);
+	const timeline = buildMyDayTimeline(schedules, local.date, local.time);
+	const macroLine = nutritionMacroLine(context);
+	const readySources = context.categories.filter(
+		(category) => category.status === "ready",
+	).length;
+	const body = `<main class="shell">
+		<section class="hero">
+			<div>
+				<span class="eyebrow">My day so far</span>
+				<h1>Track the day as it happens.</h1>
+				<p class="lede">A timeline of scheduled ZorFit check-ins, nutrition briefs, recovery reads, and workout nudges for ${escapeHtml(local.date)}.</p>
+			</div>
+			<div class="panel">
+				<strong>Signed in as @${escapeHtml(session.login)}</strong>
+				<p>${escapeHtml(timezone)} · ${escapeHtml(local.time)} local time</p>
+				<div class="actions">
+					<a class="button" href="/settings/messages">Edit messages</a>
+					<a class="button" href="/settings/data-routing">Data routing</a>
+				</div>
+			</div>
+		</section>
+		<section class="section">
+			<div class="section-head">
+				<div>
+					<span class="eyebrow">Scores</span>
+					<h2>Today at a glance.</h2>
+				</div>
+				<p>${readySources} health categories returned data${macroLine ? ` · ${escapeHtml(macroLine)}` : ""}</p>
+			</div>
+			<div class="score-grid">
+				${renderScoreCard("Overall score", scores.overall)}
+				${renderScoreCard("Nutrition score", scores.nutrition)}
+				${renderScoreCard("Readiness score", scores.readiness)}
+				${renderScoreCard("Fitness score", scores.fitness)}
+			</div>
+			<div class="motivation">
+				<h3>Coach note</h3>
+				<p>${escapeHtml(motivationalMessage(scores))}</p>
+			</div>
+		</section>
+		<section class="section">
+			<div class="section-head">
+				<div>
+					<span class="eyebrow">Timeline</span>
+					<h2>My day so far.</h2>
+				</div>
+				<p>Completed message slots appear here after the scheduler sends them. Pending slots are due today but have not been marked sent yet.</p>
+			</div>
+			<div class="panel">
+				<div class="timeline">
+					${timeline.map(renderTimelineItem).join("")}
+				</div>
+			</div>
+		</section>
+	</main>`;
+	return c.html(settingsShell("My Day So Far", body));
 });
 
 utilityRoutes.get("/api/data-preferences", async (c) => {
