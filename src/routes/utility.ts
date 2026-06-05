@@ -1063,7 +1063,7 @@ utilityRoutes.get("/settings/llm/:id", async (c) => {
 			<label for="requestSettings">Advanced request settings</label>
 			<textarea id="requestSettings" name="requestSettings" spellcheck="false" placeholder="{}">${escapeHtml(JSON.stringify(requestSettings, null, 2))}</textarea>
 			<div class="helper">
-				Optional provider-specific JSON for token limits, temperature, and reasoning controls. ZorFit blocks model, messages, credentials, streaming, and unknown settings. Groq GPT-OSS models work best with <strong>include_reasoning: false</strong> and a larger <strong>max_completion_tokens</strong> value.
+				Optional provider-specific JSON for token limits, temperature, and reasoning controls. ZorFit blocks model, messages, credentials, streaming, and unknown settings. Groq GPT-OSS models work best with <strong>include_reasoning: false</strong>, <strong>reasoning_effort: "low"</strong>, and <strong>max_completion_tokens: 4000</strong>.
 			</div>
 			<div class="actions">
 				<button class="primary" type="submit" ${session ? "" : "disabled"}>Save ${provider.label}</button>
@@ -1112,7 +1112,7 @@ utilityRoutes.get("/settings/llm/:id", async (c) => {
 			if (provider !== "groq" || !modelInput.value.trim().toLowerCase().startsWith("openai/gpt-oss-")) return;
 			const current = requestSettingsInput.value.trim();
 			if (!current || current === "{}") {
-				requestSettingsInput.value = JSON.stringify({ include_reasoning: false, reasoning_effort: "low", max_completion_tokens: 1800 }, null, 2);
+				requestSettingsInput.value = JSON.stringify({ include_reasoning: false, reasoning_effort: "low", max_completion_tokens: 4000 }, null, 2);
 			}
 		});
 	</script>`;

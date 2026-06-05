@@ -138,11 +138,11 @@ export function recommendedAiRequestSettings(
 		return {
 			include_reasoning: false,
 			reasoning_effort: "low",
-			max_completion_tokens: 1800,
+			max_completion_tokens: 4000,
 		};
 	}
 	if (provider === "groq" && model.startsWith("qwen/qwen3")) {
-		return { reasoning_format: "hidden", max_completion_tokens: 1800 };
+		return { reasoning_format: "hidden", max_completion_tokens: 4000 };
 	}
 	return {};
 }

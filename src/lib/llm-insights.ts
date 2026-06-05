@@ -22,6 +22,10 @@ const DEFAULT_BASE_URLS: Record<AiProviderId, string> = {
 	google_ai_studio: "https://generativelanguage.googleapis.com/v1beta",
 };
 
+const GROQ_COMPACT_NUTRITION_LENGTH = 4500;
+const GROQ_413_NUTRITION_LENGTH = 3000;
+const GROQ_RESCUE_COMPLETION_TOKENS = 4000;
+
 function trimSlash(value: string): string {
 	return value.replace(/\/+$/, "");
 }
@@ -331,6 +335,30 @@ function openAiRequestSettings(connection: AiConnection): AiRequestSettings {
 	return { ...defaults, ...connection.requestSettings };
 }
 
+function isGroqGptOss(connection: AiConnection): boolean {
+	return (
+		connection.provider === "groq" &&
+		connection.modelName.trim().toLowerCase().startsWith("openai/gpt-oss-")
+	);
+}
+
+function groqRescueRequestSettings(
+	settings: AiRequestSettings,
+	connection: AiConnection,
+): AiRequestSettings {
+	const rescue = { ...settings };
+	delete rescue.max_tokens;
+	rescue.max_completion_tokens = Math.max(
+		Number(rescue.max_completion_tokens ?? 0),
+		GROQ_RESCUE_COMPLETION_TOKENS,
+	);
+	if (isGroqGptOss(connection)) {
+		rescue.include_reasoning = false;
+		rescue.reasoning_effort = "low";
+	}
+	return rescue;
+}
+
 function textFromOpenAiContent(content: unknown): string {
 	if (typeof content === "string") return content.trim();
 	if (!Array.isArray(content)) return "";
@@ -392,12 +420,15 @@ async function callOpenAiCompatible(
 	let response = await request(requestSettings);
 	let usedCompactRetry = false;
 	if (response.status === 413 && connection.provider === "groq") {
-		const fallbackSettings = { ...requestSettings };
-		delete fallbackSettings.max_tokens;
-		fallbackSettings.max_completion_tokens = 1800;
-		fallbackSettings.include_reasoning = false;
-		fallbackSettings.reasoning_effort = "low";
-		response = await request(fallbackSettings, 9000, true);
+		const fallbackSettings = groqRescueRequestSettings(
+			requestSettings,
+			connection,
+		);
+		response = await request(
+			fallbackSettings,
+			GROQ_413_NUTRITION_LENGTH,
+			true,
+		);
 		usedCompactRetry = true;
 	}
 	if (!response.ok) {
@@ -423,12 +454,15 @@ async function callOpenAiCompatible(
 		connection.provider === "groq" &&
 		!usedCompactRetry
 	) {
-		const fallbackSettings = { ...requestSettings };
-		delete fallbackSettings.max_tokens;
-		fallbackSettings.max_completion_tokens = 1800;
-		fallbackSettings.include_reasoning = false;
-		fallbackSettings.reasoning_effort = "low";
-		const retry = await request(fallbackSettings, 9000, true);
+		const fallbackSettings = groqRescueRequestSettings(
+			requestSettings,
+			connection,
+		);
+		const retry = await request(
+			fallbackSettings,
+			GROQ_COMPACT_NUTRITION_LENGTH,
+			true,
+		);
 		if (!retry.ok) {
 			throw new Error(
 				`Groq retry failed (${retry.status}): ${(await retry.text()).slice(0, 500)}`,
@@ -440,6 +474,9 @@ async function callOpenAiCompatible(
 		usedCompactRetry = true;
 	}
 	if (choice?.finish_reason === "length") {
+		if (text && connection.provider === "groq") {
+			return `${text}\n\nNote: Groq reached its output limit, so this insight may end early. To avoid truncation, use a non-reasoning Groq model, raise max_completion_tokens, or select a provider with a larger output budget.`;
+		}
 		throw new Error(
 			"Groq stopped before completing the nutrition insight. Select a non-reasoning model or a provider with a larger available output budget.",
 		);

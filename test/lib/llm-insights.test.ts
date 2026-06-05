@@ -42,7 +42,7 @@ describe("LLM nutrition insights", () => {
 			model: "openai/gpt-oss-120b",
 			include_reasoning: false,
 			reasoning_effort: "low",
-			max_completion_tokens: 1800,
+			max_completion_tokens: 4000,
 		});
 		expect(body.max_tokens).toBeUndefined();
 	});
@@ -131,7 +131,7 @@ describe("LLM nutrition insights", () => {
 
 		expect(fetchMock).toHaveBeenCalledTimes(2);
 		const retryBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
-		expect(retryBody.max_completion_tokens).toBe(1800);
+		expect(retryBody.max_completion_tokens).toBe(4000);
 		expect(retryBody.include_reasoning).toBe(false);
 		expect(retryBody.reasoning_effort).toBe("low");
 		expect(retryBody.messages[1].content).toContain(
@@ -221,6 +221,40 @@ describe("LLM nutrition insights", () => {
 		expect(fetchMock).toHaveBeenCalledTimes(2);
 		const retryBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
 		expect(retryBody.reasoning_effort).toBe("low");
-		expect(retryBody.max_completion_tokens).toBe(1800);
+		expect(retryBody.max_completion_tokens).toBe(4000);
+	});
+
+	it("returns Groq partial text with a warning when the compact retry also truncates", async () => {
+		vi.spyOn(globalThis, "fetch")
+			.mockResolvedValueOnce(
+				new Response(
+					JSON.stringify({
+						choices: [
+							{
+								finish_reason: "length",
+								message: { content: "**1. MACROS** Car" },
+							},
+						],
+					}),
+					{ status: 200 },
+				),
+			)
+			.mockResolvedValueOnce(
+				new Response(
+					JSON.stringify({
+						choices: [
+							{
+								finish_reason: "length",
+								message: { content: "Usable compact nutrition insight" },
+							},
+						],
+					}),
+					{ status: 200 },
+				),
+			);
+
+		const result = await generateNutritionInsight(connection(), INPUT);
+		expect(result).toContain("Usable compact nutrition insight");
+		expect(result).toContain("Groq reached its output limit");
 	});
 });

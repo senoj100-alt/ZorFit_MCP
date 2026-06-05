@@ -30,7 +30,7 @@ describe("AI request settings", () => {
 			{
 				include_reasoning: false,
 				reasoning_effort: "low",
-				max_completion_tokens: 1800,
+				max_completion_tokens: 4000,
 			},
 		);
 	});
