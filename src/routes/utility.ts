@@ -71,9 +71,13 @@ utilityRoutes.get("/stats", async (c) => {
 });
 
 utilityRoutes.get("/signup", (c) => {
+	const githubReady = Boolean(c.env.GITHUB_CLIENT_ID && c.env.GITHUB_CLIENT_SECRET);
 	const googleReady = Boolean(
 		c.env.GOOGLE_LOGIN_CLIENT_ID && c.env.GOOGLE_LOGIN_CLIENT_SECRET,
 	);
+	const githubAction = githubReady
+		? `<a class="button primary" href="/connections">Continue with GitHub</a>`
+		: `<span class="button disabled">GitHub setup pending</span>`;
 	const googleAction = googleReady
 		? `<a class="button google" href="/auth/google?return_to=/connections">Continue with Google</a>`
 		: `<span class="button disabled">Google setup pending</span>`;
@@ -199,10 +203,10 @@ utilityRoutes.get("/signup", (c) => {
 		<h1>Create your ZorFit account.</h1>
 		<p>Choose a sign-in method, then connect your fitness sources from the dashboard.</p>
 		<div class="actions">
-			<a class="button primary" href="/connections">Continue with GitHub</a>
+			${githubAction}
 			${googleAction}
 		</div>
-		<p class="note">GitHub is available now. Google sign-in will work after the Google OAuth client ID and secret are configured in Cloudflare.</p>
+		<p class="note">Sign-in options become active after their OAuth client IDs and secrets are configured in Cloudflare.</p>
 		<a class="back" href="/">Back to homepage</a>
 	</main>
 </body>

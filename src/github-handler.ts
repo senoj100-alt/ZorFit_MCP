@@ -375,6 +375,10 @@ app.get("/authorize", async (c) => {
 	}
 
 	// User not authenticated, redirect to GitHub OAuth
+	if (!c.env.GITHUB_CLIENT_ID || !c.env.GITHUB_CLIENT_SECRET) {
+		return c.html(renderAuthSetupPage("GitHub", ["GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET"]));
+	}
+
 	const githubState = generateState();
 
 	// Store OAuth state and client info
@@ -812,6 +816,13 @@ const SERVICE_CONFIG: Record<
 };
 
 function connectionLoginRedirect(c: any, path: string) {
+	if (!c.env.GITHUB_CLIENT_ID || !c.env.GITHUB_CLIENT_SECRET) {
+		const url = new URL(c.req.url);
+		url.pathname = "/signup";
+		url.search = "";
+		return c.redirect(url.toString());
+	}
+
 	const url = new URL(c.req.url);
 	const authorizeUrl = new URL("/authorize", url.origin);
 	authorizeUrl.searchParams.set("client_id", "connections");
