@@ -682,6 +682,7 @@ function settingsShell(title: string, body: string): string {
 			gap: 14px;
 		}
 		.score-card {
+			position: relative;
 			padding: 16px;
 			min-height: 150px;
 		}
@@ -701,6 +702,54 @@ function settingsShell(title: string, body: string): string {
 			line-height: 0.9;
 		}
 		.score-card p { margin: 12px 0 0; font-size: 0.9rem; }
+		.score-head {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 10px;
+		}
+		.score-help {
+			position: relative;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			width: 24px;
+			height: 24px;
+			border: 1px solid rgba(245, 242, 236, 0.16);
+			border-radius: 999px;
+			color: var(--green);
+			font-size: 0.8rem;
+			font-weight: 900;
+			cursor: help;
+		}
+		.score-tooltip {
+			position: absolute;
+			top: 34px;
+			right: 0;
+			z-index: 4;
+			display: none;
+			width: min(320px, calc(100vw - 64px));
+			padding: 12px;
+			border: 1px solid rgba(245, 242, 236, 0.14);
+			border-radius: 8px;
+			background: #111;
+			box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+			color: var(--muted);
+			font-size: 0.8rem;
+			font-weight: 640;
+			letter-spacing: 0;
+			line-height: 1.45;
+			text-transform: none;
+		}
+		.score-help:hover .score-tooltip,
+		.score-help:focus .score-tooltip {
+			display: block;
+		}
+		.score-tooltip ul {
+			margin: 0;
+			padding-left: 16px;
+		}
+		.score-tooltip li { margin: 4px 0; }
 		.motivation {
 			margin-top: 18px;
 			padding: 18px;
@@ -1006,10 +1055,6 @@ function contextFor(
 	return context.categories.find((item) => item.category === category);
 }
 
-function hasReadyData(context: HealthContextBundle, categories: HealthDataCategory[]): boolean {
-	return categories.some((category) => contextFor(context, category)?.status === "ready");
-}
-
 function scoreBand(score: number): string {
 	if (score >= 85) return "Strong";
 	if (score >= 70) return "On track";
@@ -1035,63 +1080,329 @@ function numberFrom(value: unknown): number | undefined {
 	return undefined;
 }
 
-function nutritionMacroLine(context: HealthContextBundle): string | null {
-	const nutrition = contextFor(context, "nutrition");
-	const data = safeRecord(nutrition?.data);
-	const macros = safeRecord(data?.macroSummary);
+function arrayFrom(value: unknown): unknown[] {
+	if (Array.isArray(value)) return value;
+	const record = safeRecord(value);
+	if (!record) return [];
+	if (Array.isArray(record.days)) return record.days;
+	if (Array.isArray(record.data)) return record.data;
+	if (Array.isArray(record.items)) return record.items;
+	if (Array.isArray(record.results)) return record.results;
+	if (Array.isArray(record.activities)) return record.activities;
+	if (Array.isArray(record.workouts)) return record.workouts;
+	return [];
+}
+
+function valueByKeyPattern(
+	value: unknown,
+	pattern: RegExp,
+	seen = new Set<unknown>(),
+): number | undefined {
+	if (!value || typeof value !== "object" || seen.has(value)) return undefined;
+	seen.add(value);
+	if (Array.isArray(value)) {
+		for (const item of value) {
+			const found = valueByKeyPattern(item, pattern, seen);
+			if (found !== undefined) return found;
+		}
+		return undefined;
+	}
+	for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+		if (pattern.test(key)) {
+			const direct = numberFrom(child);
+			if (direct !== undefined) return direct;
+		}
+	}
+	for (const child of Object.values(value as Record<string, unknown>)) {
+		const found = valueByKeyPattern(child, pattern, seen);
+		if (found !== undefined) return found;
+	}
+	return undefined;
+}
+
+function average(values: number[]): number | undefined {
+	const clean = values.filter((value) => Number.isFinite(value));
+	if (!clean.length) return undefined;
+	return clean.reduce((sum, value) => sum + value, 0) / clean.length;
+}
+
+function percentDelta(current: number | undefined, baseline: number | undefined): number | undefined {
+	if (current === undefined || baseline === undefined || baseline === 0)
+		return undefined;
+	return ((current - baseline) / baseline) * 100;
+}
+
+function trendPhrase(delta: number | undefined, unit = "%"): string {
+	if (delta === undefined) return "trend unavailable";
+	const rounded = Math.round(delta);
+	if (rounded === 0) return `flat vs baseline`;
+	return `${rounded > 0 ? "+" : ""}${rounded}${unit} vs baseline`;
+}
+
+interface MacroDay {
+	date?: string;
+	calories?: number;
+	protein?: number;
+	carbs?: number;
+	fat?: number;
+	sugar?: number;
+	fiber?: number;
+}
+
+function macroDayFrom(value: unknown): MacroDay | null {
+	const record = safeRecord(value);
+	if (!record) return null;
+	const macros = safeRecord(record.macroSummary) ?? safeRecord(record.summary);
 	if (!macros) return null;
-	const calories = numberFrom(macros.calories_kcal);
-	const protein = numberFrom(macros.protein_g);
-	const carbs = numberFrom(macros.carbs_g);
-	const fat = numberFrom(macros.fat_g);
-	const sugar = numberFrom(macros.sugar_g);
+	return {
+		date: typeof record.date === "string" ? record.date : undefined,
+		calories: numberFrom(macros.calories_kcal ?? macros.calories ?? macros.energy),
+		protein: numberFrom(macros.protein_g ?? macros.protein ?? macros.proteinG),
+		carbs: numberFrom(macros.carbs_g ?? macros.carbs ?? macros.carbohydrates),
+		fat: numberFrom(macros.fat_g ?? macros.fat ?? macros.fatG),
+		sugar: numberFrom(macros.sugar_g ?? macros.sugar ?? macros.sugars),
+		fiber: numberFrom(macros.fiber_g ?? macros.fiber),
+	};
+}
+
+function nutritionDays(context: HealthContextBundle): MacroDay[] {
+	const nutrition = contextFor(context, "nutrition");
+	const data = nutrition?.data;
+	const rows = arrayFrom(data);
+	if (rows.length) return rows.map(macroDayFrom).filter(Boolean) as MacroDay[];
+	const single = macroDayFrom(data);
+	return single ? [single] : [];
+}
+
+function nutritionMacroLine(context: HealthContextBundle): string | null {
+	const days = nutritionDays(context);
+	const day = days[days.length - 1];
+	if (!day) return null;
 	const parts = [
-		calories !== undefined ? `${Math.round(calories)} kcal` : "",
-		protein !== undefined ? `${Math.round(protein)}g protein` : "",
-		carbs !== undefined ? `${Math.round(carbs)}g carbs` : "",
-		fat !== undefined ? `${Math.round(fat)}g fat` : "",
-		sugar !== undefined ? `${Math.round(sugar)}g sugar` : "",
+		day.calories !== undefined ? `${Math.round(day.calories)} kcal` : "",
+		day.protein !== undefined ? `${Math.round(day.protein)}g protein` : "",
+		day.carbs !== undefined ? `${Math.round(day.carbs)}g carbs` : "",
+		day.fat !== undefined ? `${Math.round(day.fat)}g fat` : "",
+		day.sugar !== undefined ? `${Math.round(day.sugar)}g sugar` : "",
 	].filter(Boolean);
 	return parts.length ? parts.join(" · ") : null;
 }
 
-function scoreSummary(context: HealthContextBundle): {
-	overall: number;
-	nutrition: number;
-	readiness: number;
-	fitness: number;
-} {
+interface ScoreBreakdown {
+	score: number;
+	details: string[];
+}
+
+interface ScoreSummary {
+	overall: ScoreBreakdown;
+	nutrition: ScoreBreakdown;
+	readiness: ScoreBreakdown;
+	fitness: ScoreBreakdown;
+}
+
+function nutritionScore(context: HealthContextBundle): ScoreBreakdown {
 	const nutrition = contextFor(context, "nutrition");
-	const macroLine = nutritionMacroLine(context);
-	const nutritionScore =
-		nutrition?.status === "ready" ? (macroLine ? 82 : 68) : nutrition ? 48 : 42;
-	const recoveryReady = hasReadyData(context, ["hrv", "sleep", "recovery"]);
-	const hrvReady = contextFor(context, "hrv")?.status === "ready";
-	const sleepReady = contextFor(context, "sleep")?.status === "ready";
-	const readinessScore = recoveryReady
-		? hrvReady && sleepReady
-			? 84
-			: 74
-		: 52;
-	const fitnessReady = hasReadyData(context, [
-		"fitness_activities",
-		"gym_workouts",
-		"steps",
-	]);
-	const fitnessScore = fitnessReady ? 78 : 55;
+	if (nutrition?.status !== "ready") {
+		return {
+			score: 42,
+			details: ["Cronometer data is missing, unavailable, or not routed to nutrition."],
+		};
+	}
+	const days = nutritionDays(context).filter(
+		(day) => day.calories !== undefined || day.protein !== undefined,
+	);
+	if (!days.length) {
+		return {
+			score: 58,
+			details: ["Cronometer responded, but no calorie or macro totals were found."],
+		};
+	}
+	const today = days[days.length - 1] as MacroDay;
+	const previous = days.slice(0, -1);
+	const baselineProtein = average(previous.map((day) => day.protein ?? Number.NaN));
+	const baselineSugar = average(previous.map((day) => day.sugar ?? Number.NaN));
+	const baselineCalories = average(previous.map((day) => day.calories ?? Number.NaN));
+	const proteinDelta = percentDelta(today.protein, baselineProtein);
+	const sugarDelta = percentDelta(today.sugar, baselineSugar);
+	let score = 68;
+	const details = [
+		`7-day nutrition window found ${days.length}/7 logged day${days.length === 1 ? "" : "s"}.`,
+	];
+	score += Math.min(10, Math.max(-12, (days.length - 4) * 3));
+	if (today.protein !== undefined) {
+		if (today.protein >= 100 || (baselineProtein && today.protein >= baselineProtein * 0.9)) {
+			score += 9;
+			details.push(`Protein is ${Math.round(today.protein)}g, ${trendPhrase(proteinDelta)}.`);
+		} else {
+			score -= 9;
+			details.push(`Protein is ${Math.round(today.protein)}g, below recent baseline.`);
+		}
+	} else {
+		score -= 8;
+		details.push("Protein total is missing.");
+	}
+	if (today.sugar !== undefined) {
+		if (today.sugar <= 25 || (baselineSugar && today.sugar <= baselineSugar * 1.05)) {
+			score += 7;
+			details.push(`Sugar is ${Math.round(today.sugar)}g, controlled against the 7-day baseline.`);
+		} else {
+			score -= today.sugar > 50 ? 12 : 7;
+			details.push(`Sugar is ${Math.round(today.sugar)}g, ${trendPhrase(sugarDelta)}.`);
+		}
+	}
+	if (today.fiber !== undefined) {
+		if (today.fiber >= 25) {
+			score += 5;
+			details.push(`Fiber is ${Math.round(today.fiber)}g, in a strong range.`);
+		} else {
+			score -= 4;
+			details.push(`Fiber is ${Math.round(today.fiber)}g; higher fiber would improve the score.`);
+		}
+	}
+	if (today.calories !== undefined && baselineCalories) {
+		const calorieDelta = Math.abs(percentDelta(today.calories, baselineCalories) ?? 0);
+		score += calorieDelta <= 35 ? 4 : -6;
+		details.push(`Calories are ${Math.round(today.calories)} kcal, ${trendPhrase(percentDelta(today.calories, baselineCalories))}.`);
+	}
+	return { score: boundedScore(score), details };
+}
+
+function metricSeries(
+	context: HealthContextBundle,
+	category: HealthDataCategory,
+	pattern: RegExp,
+): number[] {
+	const source = contextFor(context, category);
+	return arrayFrom(source?.data)
+		.map((item) => valueByKeyPattern(item, pattern))
+		.filter((value): value is number => value !== undefined);
+}
+
+function readinessScore(context: HealthContextBundle): ScoreBreakdown {
+	const hrv = [
+		...metricSeries(context, "hrv", /^(hrv|hrv_rmssd|rmssd|hrv_sdnn)$/i),
+		...metricSeries(context, "recovery", /^(hrv|hrv_rmssd|rmssd|hrv_sdnn)$/i),
+	];
+	const sleepSeconds = [
+		...metricSeries(context, "sleep", /sleep.*(sec|duration|total)|total_sleep|sleep_secs/i),
+		...metricSeries(context, "recovery", /sleep.*(sec|duration|total)|total_sleep|sleep_secs/i),
+	];
+	const restingHr = [
+		...metricSeries(context, "hrv", /resting.*hr|resting.*heart|resting_heartrate|restingHR/i),
+		...metricSeries(context, "recovery", /resting.*hr|resting.*heart|resting_heartrate|restingHR/i),
+	];
+	const latestHrv = hrv[hrv.length - 1];
+	const hrvBaseline = average(hrv.slice(0, -1));
+	const latestSleepHours =
+		sleepSeconds[sleepSeconds.length - 1] !== undefined
+			? (sleepSeconds[sleepSeconds.length - 1] as number) / 3600
+			: undefined;
+	const sleepBaselineSeconds = average(sleepSeconds.slice(0, -1));
+	const sleepBaselineHours =
+		sleepBaselineSeconds !== undefined ? sleepBaselineSeconds / 3600 : undefined;
+	const latestRestingHr = restingHr[restingHr.length - 1];
+	const restingHrBaseline = average(restingHr.slice(0, -1));
+	let score = hrv.length || sleepSeconds.length ? 68 : 48;
+	const details = [
+		`Readiness uses ${hrv.length} HRV point${hrv.length === 1 ? "" : "s"} and ${sleepSeconds.length} sleep point${sleepSeconds.length === 1 ? "" : "s"} from the recent window.`,
+	];
+	const hrvDelta = percentDelta(latestHrv, hrvBaseline);
+	if (latestHrv !== undefined && hrvDelta !== undefined) {
+		if (hrvDelta >= 5) score += 14;
+		else if (hrvDelta >= -5) score += 6;
+		else if (hrvDelta < -12) score -= 16;
+		else score -= 8;
+		details.push(`HRV latest ${Math.round(latestHrv)} ms, ${trendPhrase(hrvDelta)}.`);
+	} else {
+		score -= 5;
+		details.push("HRV trend is incomplete.");
+	}
+	if (latestSleepHours !== undefined) {
+		if (latestSleepHours >= 7) score += 11;
+		else if (latestSleepHours >= 6) score += 2;
+		else score -= 12;
+		const sleepDelta = percentDelta(latestSleepHours, sleepBaselineHours);
+		details.push(`Sleep latest ${latestSleepHours.toFixed(1)}h, ${trendPhrase(sleepDelta)}.`);
+	} else {
+		score -= 5;
+		details.push("Sleep duration trend is incomplete.");
+	}
+	const restingDelta = percentDelta(latestRestingHr, restingHrBaseline);
+	if (latestRestingHr !== undefined && restingDelta !== undefined) {
+		score += restingDelta <= 3 ? 5 : -7;
+		details.push(`Resting HR latest ${Math.round(latestRestingHr)} bpm, ${trendPhrase(restingDelta)}.`);
+	}
+	return { score: boundedScore(score), details };
+}
+
+function activityLoadFrom(value: unknown): number | undefined {
+	return (
+		valueByKeyPattern(value, /training.*load|icu.*load|suffer|strain|trimp/i) ??
+		valueByKeyPattern(value, /kilojoule|calorie|moving.*time|elapsed.*time|distance/i)
+	);
+}
+
+function fitnessScore(context: HealthContextBundle): ScoreBreakdown {
+	const activities = [
+		...arrayFrom(contextFor(context, "fitness_activities")?.data),
+		...arrayFrom(contextFor(context, "gym_workouts")?.data),
+		...arrayFrom(contextFor(context, "steps")?.data),
+	];
+	if (!activities.length) {
+		return {
+			score: 50,
+			details: ["No recent activity, gym, or steps data was returned by routed sources."],
+		};
+	}
+	const loads = activities
+		.map(activityLoadFrom)
+		.filter((value): value is number => value !== undefined && value > 0);
+	const latestLoad = loads[loads.length - 1];
+	const baselineLoad = average(loads.slice(0, -1));
+	const loadDelta = percentDelta(latestLoad, baselineLoad);
+	let score = 62;
+	const details = [
+		`Fitness uses ${activities.length} recent activity/workout record${activities.length === 1 ? "" : "s"}.`,
+	];
+	if (activities.length >= 5) score += 12;
+	else if (activities.length >= 3) score += 8;
+	else score -= 6;
+	if (latestLoad !== undefined && loadDelta !== undefined) {
+		if (loadDelta > 80) score -= 8;
+		else if (loadDelta >= -25 && loadDelta <= 50) score += 8;
+		else score += 2;
+		details.push(`Latest load proxy ${Math.round(latestLoad)}, ${trendPhrase(loadDelta)}.`);
+	} else {
+		details.push("Training load proxy is limited, so activity count is weighted more heavily.");
+	}
+	return { score: boundedScore(score), details };
+}
+
+function scoreSummary(context: HealthContextBundle): ScoreSummary {
+	const nutrition = nutritionScore(context);
+	const readiness = readinessScore(context);
+	const fitness = fitnessScore(context);
+	const overallValue =
+		nutrition.score * 0.35 + readiness.score * 0.35 + fitness.score * 0.3;
 	return {
-		nutrition: boundedScore(nutritionScore),
-		readiness: boundedScore(readinessScore),
-		fitness: boundedScore(fitnessScore),
-		overall: boundedScore((nutritionScore + readinessScore + fitnessScore) / 3),
+		nutrition,
+		readiness,
+		fitness,
+		overall: {
+			score: boundedScore(overallValue),
+			details: [
+				`Weighted score = nutrition 35% (${nutrition.score}), readiness 35% (${readiness.score}), fitness 30% (${fitness.score}).`,
+				"Each component uses the recent routed data window where available.",
+			],
+		},
 	};
 }
 
-function motivationalMessage(scores: ReturnType<typeof scoreSummary>): string {
-	if (scores.overall >= 80) {
+function motivationalMessage(scores: ScoreSummary): string {
+	if (scores.overall.score >= 80) {
 		return "You are stacking good signals today. Keep the next decision simple: fuel well, move with intent, and protect tonight's sleep.";
 	}
-	if (scores.overall >= 65) {
+	if (scores.overall.score >= 65) {
 		return "Today is still very steerable. One solid meal, one focused training choice, and one clean recovery habit can move the whole day up.";
 	}
 	return "No panic, just precision. Tighten the next four hours: hydrate, get protein in, take an easy walk, and make the next log count.";
@@ -1149,11 +1460,16 @@ function buildMyDayTimeline(
 	];
 }
 
-function renderScoreCard(label: string, score: number): string {
+function renderScoreCard(label: string, breakdown: ScoreBreakdown): string {
 	return `<article class="panel score-card">
-		<strong>${escapeHtml(label)}</strong>
-		<div class="score-value">${score}</div>
-		<p>${escapeHtml(scoreBand(score))}</p>
+		<div class="score-head">
+			<strong>${escapeHtml(label)}</strong>
+			<span class="score-help" tabindex="0" aria-label="${escapeHtml(label)} calculation details">?
+				<span class="score-tooltip"><ul>${breakdown.details.map((detail) => `<li>${escapeHtml(detail)}</li>`).join("")}</ul></span>
+			</span>
+		</div>
+		<div class="score-value">${breakdown.score}</div>
+		<p>${escapeHtml(scoreBand(breakdown.score))}</p>
 	</article>`;
 }
 
@@ -2251,6 +2567,7 @@ utilityRoutes.get("/my-day", async (c) => {
 		categories,
 		timezone,
 		date: local.date,
+		rangeDays: 7,
 	});
 	const scores = scoreSummary(context);
 	const timeline = buildMyDayTimeline(schedules, local.date, local.time);

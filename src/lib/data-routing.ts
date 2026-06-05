@@ -295,6 +295,23 @@ async function collectCategoryData(
 				timezone,
 				sessionCache: new KvCronometerSessionCache(env.OAUTH_KV),
 			});
+			if (rangeDays > 1) {
+				const oldest = rangeStartDate(date, rangeDays);
+				const start = new Date(`${oldest}T00:00:00Z`);
+				const days = await Promise.all(
+					Array.from({ length: rangeDays }, async (_, index) => {
+						const day = new Date(start);
+						day.setUTCDate(start.getUTCDate() + index);
+						const dayString = day.toISOString().slice(0, 10);
+						return client.getDailyNutrition(dayString).catch((error) => ({
+							date: dayString,
+							status: "error",
+							note: error instanceof Error ? error.message : String(error),
+						}));
+					}),
+				);
+				return { category, provider, status: "ready", data: { date, days, today: days[days.length - 1] } };
+			}
 			return { category, provider, status: "ready", data: await client.getDailyNutrition(date) };
 		}
 		if (category === "gym_workouts" && provider === "hevy") {
