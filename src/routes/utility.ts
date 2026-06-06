@@ -2280,7 +2280,11 @@ function renderPatternCards(context: HealthContextBundle): string {
 		}
 	}
 	if (!candidates.length) {
-		return `<p>Pattern detection is waiting for real 4-8 week history. Connect and route Cronometer, Intervals.icu, Strava, Hevy, HRV, and sleep data to unlock learned correlations.</p>`;
+		return `<div class="pattern-card">
+			<small>Waiting for history</small>
+			<strong>Pattern detection will wake up after 4-8 weeks of routed data.</strong>
+			<p>Connect Cronometer, Intervals.icu, Strava, Hevy, HRV, and sleep data. Once the window is wide enough, ZorFit can start calling real correlations instead of one-off guesses.</p>
+		</div>`;
 	}
 	return `<div class="pattern-list">
 		${candidates
