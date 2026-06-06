@@ -36,6 +36,39 @@ import { sendLongTelegramMessage } from "./telegram.js";
 const TELEGRAM_SAFETY_FOOTER =
 	"Not medical advice. Consult a qualified professional for health or nutrition decisions.";
 
+function telegramInsightMessage(args: {
+	title: string;
+	date: string;
+	question?: string;
+	insight: string;
+	dataCheck?: string;
+}): string {
+	return [
+		`**${args.title}**`,
+		`Date: ${args.date}`,
+		args.question ? `Question: ${args.question}` : "",
+		args.dataCheck ? `Data check: ${args.dataCheck}` : "",
+		"",
+		args.insight,
+		"",
+		TELEGRAM_SAFETY_FOOTER,
+	]
+		.filter((line) => line !== "")
+		.join("\n");
+}
+
+function contextDataCheck(context: Awaited<ReturnType<typeof collectHealthContext>>): string {
+	const ready = context.categories.filter((category) => category.status === "ready").length;
+	const total = context.categories.length;
+	const missing = context.categories
+		.filter((category) => category.status !== "ready")
+		.map((category) => category.category.replace(/_/g, " "))
+		.slice(0, 3);
+	return missing.length
+		? `${ready}/${total} categories ready; missing ${missing.join(", ")}`
+		: `${ready}/${total} categories ready`;
+}
+
 function compactInsightSummary(value: string): string {
 	return value
 		.replace(/<[^>]+>/g, "")
@@ -159,7 +192,12 @@ async function processDueSchedule(
 		schedule.insightMode === "previous_day" || date < schedule.localDate
 			? "ZorFit previous day nutrition"
 			: "ZorFit nutrition check-in";
-	const text = `${title}\n\n${insight}\n\n${TELEGRAM_SAFETY_FOOTER}`;
+	const text = telegramInsightMessage({
+		title,
+		date,
+		insight,
+		dataCheck: "Cronometer nutrition retrieved for this insight.",
+	});
 	await sendLongTelegramMessage(env, {
 		chatId: telegram.externalUserId,
 		text,
@@ -219,7 +257,13 @@ async function processDueUserMessageSchedule(
 	const insight = aiConnection
 		? await generateHealthInsight(aiConnection, input)
 		: generateBasicHealthInsight(input);
-	const text = `${schedule.title}\n\n${insight}\n\n${TELEGRAM_SAFETY_FOOTER}`;
+	const text = telegramInsightMessage({
+		title: schedule.title,
+		date,
+		question,
+		insight,
+		dataCheck: contextDataCheck(context),
+	});
 	await sendLongTelegramMessage(env, {
 		chatId: telegram.externalUserId,
 		text,
@@ -295,7 +339,12 @@ export async function sendTestNutritionInsight(
 		: generateBasicNutritionInsight(insightInput);
 	await sendLongTelegramMessage(env, {
 		chatId: telegram.externalUserId,
-		text: `ZorFit test nutrition insight\n\n${insight}\n\n${TELEGRAM_SAFETY_FOOTER}`,
+		text: telegramInsightMessage({
+			title: "ZorFit test nutrition insight",
+			date,
+			insight,
+			dataCheck: "Cronometer nutrition retrieved for this test insight.",
+		}),
 	});
 }
 

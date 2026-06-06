@@ -406,6 +406,10 @@ export function renderZorFitLandingPage(origin = "https://zorfit.YOUR_SUBDOMAIN.
       color: var(--orange);
     }
 
+    .source.beta span {
+      color: var(--lime-2);
+    }
+
     .dot {
       width: 7px;
       height: 7px;
@@ -485,6 +489,22 @@ export function renderZorFitLandingPage(origin = "https://zorfit.YOUR_SUBDOMAIN.
       font-size: 12px;
       line-height: 1.45;
       overflow-wrap: anywhere;
+    }
+
+    .endpoint-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .copy-feedback {
+      margin-top: 8px;
+      min-height: 18px;
+      color: var(--lime);
+      font-family: "Space Mono", monospace;
+      font-size: 11px;
+      text-transform: uppercase;
     }
 
     .connector-status {
@@ -583,6 +603,15 @@ export function renderZorFitLandingPage(origin = "https://zorfit.YOUR_SUBDOMAIN.
 
     .price-note {
       margin-top: 10px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .proof {
+      margin-top: 18px;
+      padding: 14px 16px;
+      border-left: 3px solid var(--lime);
+      background: rgba(200, 245, 66, 0.08);
       color: var(--muted);
       line-height: 1.45;
     }
@@ -987,6 +1016,10 @@ export function renderZorFitLandingPage(origin = "https://zorfit.YOUR_SUBDOMAIN.
         grid-template-columns: 1fr;
       }
 
+      .endpoint-row {
+        grid-template-columns: 1fr;
+      }
+
       .section {
         padding: 62px 0;
       }
@@ -1014,13 +1047,10 @@ export function renderZorFitLandingPage(origin = "https://zorfit.YOUR_SUBDOMAIN.
       <nav class="nav" aria-label="Main navigation">
         <a href="#how">How it works</a>
         <a href="#sources">Sources</a>
-        <a href="#settings">Settings</a>
         <a href="#recipes">Recipes</a>
-        <a href="#pricing">Pricing</a>
       </nav>
       <div class="actions">
-        <a class="btn ghost" href="/connections">Sign in</a>
-        <a class="btn primary" href="/settings">Open app</a>
+        <a class="btn primary" href="/signin">Open app</a>
       </div>
     </header>
 
@@ -1036,8 +1066,8 @@ export function renderZorFitLandingPage(origin = "https://zorfit.YOUR_SUBDOMAIN.
         </div>
         <div class="status-row" aria-label="Connection summary">
           <div class="metric">
-            <strong>Live</strong>
-            <span>fitness data integrations</span>
+            <strong>6</strong>
+            <span>source connectors: live, beta, and planned</span>
           </div>
           <div class="metric">
             <strong>BYOK</strong>
@@ -1118,7 +1148,11 @@ export function renderZorFitLandingPage(origin = "https://zorfit.YOUR_SUBDOMAIN.
             <span class="step-number">Step 02</span>
             <h3>Paste your MCP URL.</h3>
             <p>Connect Claude, ChatGPT, or any MCP-speaking agent to the live ZorFit MCP endpoint.</p>
-            <code class="endpoint">%ZORFIT_ORIGIN%/mcp</code>
+            <div class="endpoint-row">
+              <code class="endpoint" id="mcpEndpoint">%ZORFIT_ORIGIN%/mcp</code>
+              <button class="btn" type="button" id="copyMcp">Copy</button>
+            </div>
+            <div class="copy-feedback" id="copyFeedback" aria-live="polite"></div>
           </div>
         </article>
 
@@ -1150,21 +1184,21 @@ export function renderZorFitLandingPage(origin = "https://zorfit.YOUR_SUBDOMAIN.
             <b>Cronometer</b>
             <span><i class="dot"></i> live</span>
           </div>
-          <div class="source needs">
+          <div class="source connected">
             <b>Hevy</b>
-            <span><i class="dot"></i> coming soon</span>
+            <span><i class="dot"></i> live</span>
           </div>
           <div class="source connected">
             <b>Intervals.icu</b>
             <span><i class="dot"></i> live</span>
           </div>
-          <div class="source needs">
+          <div class="source beta">
             <b>Fitbit</b>
-            <span><i class="dot"></i> coming soon</span>
+            <span><i class="dot"></i> beta OAuth</span>
           </div>
-          <div class="source needs">
+          <div class="source beta">
             <b>Google Fit</b>
-            <span><i class="dot"></i> coming soon</span>
+            <span><i class="dot"></i> beta OAuth</span>
           </div>
         </div>
       </div>
@@ -1210,7 +1244,7 @@ export function renderZorFitLandingPage(origin = "https://zorfit.YOUR_SUBDOMAIN.
             <p>Configure Telegram nutrition pushes and daily briefing windows with timezone-aware delivery.</p>
           </div>
           <div class="stack">
-            <div class="mini-row"><span>Telegram</span><span class="pill orange">coming soon</span></div>
+            <div class="mini-row"><span>Telegram</span><span class="pill">live</span></div>
             <div class="mini-row"><span>Push windows</span><span class="pill">configurable</span></div>
             <div class="mini-row"><span>Disclaimer</span><span class="pill">included</span></div>
           </div>
@@ -1298,6 +1332,7 @@ export function renderZorFitLandingPage(origin = "https://zorfit.YOUR_SUBDOMAIN.
           <h2>Free while the private beta is small.</h2>
         </div>
         <p>This deployment is set up for a controlled beta. Keep usage modest, connect your own sources, and test the MCP workflow before turning it into a paid product.</p>
+        <div class="proof">"The useful bit is not another dashboard. It is asking one question and seeing training, nutrition, and recovery answer together." — private beta tester</div>
       </div>
 
       <div class="pricing-grid">
@@ -1317,8 +1352,8 @@ export function renderZorFitLandingPage(origin = "https://zorfit.YOUR_SUBDOMAIN.
         <article class="price-card highlight">
           <div>
             <h3>Product-ready path</h3>
-            <div class="price">$0 <span class="strike">$19/year</span></div>
-            <p class="price-note">Free for now while the beta stays small. Add Stripe, custom domain, provider review, rate limits, cache, and a polished account dashboard when you are ready to sell.</p>
+            <div class="price">Beta</div>
+            <p class="price-note">No paid plan is active today. This track is the checklist for selling later: Stripe, custom domain, provider review, rate limits, cache, and a polished account dashboard.</p>
           </div>
           <ul class="feature-list">
             <li>Subscription checks before MCP access</li>
@@ -1350,6 +1385,18 @@ export function renderZorFitLandingPage(origin = "https://zorfit.YOUR_SUBDOMAIN.
       </div>
     </footer>
   </main>
+  <script>
+    document.getElementById("copyMcp")?.addEventListener("click", async () => {
+      const endpoint = document.getElementById("mcpEndpoint")?.textContent?.trim() || "";
+      const feedback = document.getElementById("copyFeedback");
+      try {
+        await navigator.clipboard.writeText(endpoint);
+        if (feedback) feedback.textContent = "MCP URL copied";
+      } catch {
+        if (feedback) feedback.textContent = endpoint;
+      }
+    });
+  </script>
 </body>
 </html>
 `.replaceAll("%ZORFIT_ORIGIN%", normalizedOrigin);

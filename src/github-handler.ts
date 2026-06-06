@@ -973,6 +973,57 @@ app.get("/connections", async (c) => {
 			gap: 16px;
 			margin-top: 28px;
 		}
+		.health-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+			gap: 14px;
+			margin-top: 22px;
+		}
+		.health-card {
+			padding: 16px;
+			border: 1px solid rgba(245, 242, 236, 0.1);
+			border-radius: 8px;
+			background: rgba(245, 242, 236, 0.04);
+		}
+		.health-top {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 10px;
+			margin-bottom: 10px;
+		}
+		.health-dot {
+			width: 10px;
+			height: 10px;
+			border-radius: 99px;
+			background: var(--danger);
+		}
+		.health-dot.green { background: var(--lime); }
+		.health-dot.yellow { background: var(--orange); }
+		.health-card strong { display: block; }
+		.health-card p {
+			margin: 0;
+			font-size: 0.86rem;
+		}
+		.freshness-strip {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 12px;
+			margin-top: 18px;
+			padding: 14px 16px;
+			border: 1px solid rgba(200, 245, 66, 0.22);
+			border-radius: 8px;
+			background: rgba(200, 245, 66, 0.07);
+		}
+		.freshness-strip span {
+			color: var(--lime);
+			font-family: "Space Mono", monospace;
+			font-size: 0.78rem;
+			font-weight: 820;
+			letter-spacing: 0.08em;
+			text-transform: uppercase;
+		}
 
 		.card {
 			display: flex;
@@ -1106,6 +1157,9 @@ app.get("/connections", async (c) => {
 			</a>
 			<div class="nav-actions">
 				<a class="button" href="/">Home</a>
+				<a class="button" href="/my-day">My day</a>
+				<a class="button" href="/my-week">My week</a>
+				<a class="button" href="/my-fitness">Fitness</a>
 				<a class="button" href="/health">Status</a>
 				<a class="button primary" href="/logout">Logout</a>
 			</div>
@@ -1123,15 +1177,23 @@ app.get("/connections", async (c) => {
 				<div class="summary-card"><strong>6</strong><span>Sources</span></div>
 				<div class="summary-card"><strong>/mcp</strong><span>Endpoint</span></div>
 			</div>
+			<div class="freshness-strip">
+				<span id="freshnessLabel">Checking source freshness...</span>
+				<button type="button" id="refreshSources">Refresh</button>
+			</div>
 		</header>
 		<div id="message"></div>
+		<section class="health-grid" id="sourceHealth" aria-label="Source health dashboard"></section>
 		<section class="grid" id="services"></section>
 	</main>
 	<script>
 		const serviceConfig = ${JSON.stringify(SERVICE_CONFIG)};
 		const message = document.getElementById("message");
 		const services = document.getElementById("services");
+		const sourceHealth = document.getElementById("sourceHealth");
 		const connectedCount = document.getElementById("connectedCount");
+		const freshnessLabel = document.getElementById("freshnessLabel");
+		const refreshSources = document.getElementById("refreshSources");
 
 		function fieldLabel(field) {
 			return field.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
@@ -1148,6 +1210,18 @@ app.get("/connections", async (c) => {
 			return status.source === "worker_secret" ? "configured server" : "configured";
 		}
 
+		function healthTone(status) {
+			if (!status?.configured) return "red";
+			if (status.source === "worker_secret") return "yellow";
+			return "green";
+		}
+
+		function healthCopy(status) {
+			if (!status?.configured) return "Not connected. Insights from this source are unavailable.";
+			if (status.source === "worker_secret") return "Server-level credential active. User credential can still override it.";
+			return "Connected via account. Include freshness checks when live sync metadata is available.";
+		}
+
 		function show(text) {
 			message.textContent = text;
 			setTimeout(() => { message.textContent = ""; }, 4000);
@@ -1159,6 +1233,19 @@ app.get("/connections", async (c) => {
 			const statuses = new Map((data.statuses || []).map((status) => [status.id, status]));
 			const connected = (data.statuses || []).filter((status) => status.configured).length;
 			connectedCount.textContent = String(connected);
+			freshnessLabel.textContent = "Synced just now";
+			sourceHealth.innerHTML = Object.entries(serviceConfig).map(([id, config]) => {
+				const status = statuses.get(id);
+				const tone = healthTone(status);
+				return \`
+					<article class="health-card">
+						<div class="health-top">
+							<strong>\${config.label}</strong>
+							<span class="health-dot \${tone}" aria-label="\${tone} status"></span>
+						</div>
+						<p>\${healthCopy(status)}</p>
+					</article>\`;
+			}).join("");
 			services.innerHTML = Object.entries(serviceConfig).map(([id, config]) => {
 				const status = statuses.get(id);
 				const isConfigured = Boolean(status?.configured);
@@ -1223,6 +1310,7 @@ app.get("/connections", async (c) => {
 		});
 
 		load();
+		refreshSources.addEventListener("click", load);
 	</script>
 </body>
 </html>`;

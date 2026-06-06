@@ -320,34 +320,37 @@ const LLM_SETTINGS: SettingsCard[] = [
 	{
 		id: "openai",
 		label: "OpenAI",
-		status: "Planned",
+		status: "Recommended",
 		description: "Use your OpenAI key for nutrition and training insights.",
 		href: "/settings/llm/openai",
 		guidance: [
 			"Model examples: gpt-4o-mini, gpt-4.1-mini",
 			"Base URL: https://api.openai.com/v1",
+			"Cost tier: cheap for gpt-4o-mini style daily summaries.",
 		],
 	},
 	{
 		id: "claude",
 		label: "Claude / Anthropic",
-		status: "Planned",
+		status: "Mid cost",
 		description: "Use your Anthropic key for careful, concise insight writing.",
 		href: "/settings/llm/claude",
 		guidance: [
 			"Model examples: claude-3-5-haiku-latest, claude-3-5-sonnet-latest",
 			"Base URL: https://api.anthropic.com",
+			"Cost tier: Haiku is cheaper; Sonnet costs more but writes stronger analysis.",
 		],
 	},
 	{
 		id: "gemini",
-		label: "Gemini",
-		status: "Planned",
-		description: "Use Gemini models for AI-generated ZorFit insights.",
+		label: "Gemini / Google AI Studio",
+		status: "Free tier",
+		description: "Use Google AI Studio API keys for Gemini-family ZorFit insights.",
 		href: "/settings/llm/gemini",
 		guidance: [
 			"Model examples: gemini-1.5-flash, gemini-2.0-flash",
 			"Get keys from Google AI Studio.",
+			"Cost tier: often has a useful free/low-cost path for beta testing.",
 		],
 	},
 	{
@@ -359,6 +362,7 @@ const LLM_SETTINGS: SettingsCard[] = [
 		guidance: [
 			"Model examples: meta/llama-3.1-70b-instruct, qwen/qwen2.5-coder-32b-instruct",
 			"Copy the model ID exactly from NVIDIA Build.",
+			"Cost tier: depends on NIM credits/account plan.",
 		],
 	},
 	{
@@ -370,28 +374,19 @@ const LLM_SETTINGS: SettingsCard[] = [
 		guidance: [
 			"Model examples: openai/gpt-4o-mini, anthropic/claude-3.5-sonnet, qwen/qwen-2.5-72b-instruct",
 			"Base URL: https://openrouter.ai/api/v1",
+			"Cost tier: varies by selected model; useful for power users.",
 		],
 	},
 	{
 		id: "groq",
 		label: "Groq",
-		status: "Planned",
+		status: "Fast",
 		description: "Use Groq-hosted fast inference models for short insights.",
 		href: "/settings/llm/groq",
 		guidance: [
 			"Model examples: llama-3.1-8b-instant, llama-3.3-70b-versatile, openai/gpt-oss-120b",
 			"Base URL: https://api.groq.com/openai/v1",
-		],
-	},
-	{
-		id: "google_ai_studio",
-		label: "Google AI Studio",
-		status: "Planned",
-		description: "Use Google AI Studio API keys for Gemini-family models.",
-		href: "/settings/llm/google_ai_studio",
-		guidance: [
-			"Model examples: gemini-1.5-flash, gemini-2.0-flash",
-			"Use the API key from AI Studio, not Google login OAuth.",
+			"Cost tier: free/cheap tiers can work, but large reasoning models may hit token limits.",
 		],
 	},
 ];
@@ -862,6 +857,181 @@ function settingsShell(title: string, body: string): string {
 			letter-spacing: 0.08em;
 			text-transform: uppercase;
 		}
+		.feature-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+			gap: 14px;
+		}
+		.feature-card {
+			padding: 18px;
+			min-height: 190px;
+		}
+		.feature-card h3 {
+			margin-top: 10px;
+			font-size: 1.25rem;
+		}
+		.feature-card p {
+			margin: 10px 0 0;
+			font-size: 0.94rem;
+		}
+		.feature-card .status {
+			margin-bottom: 4px;
+		}
+		.freshness {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 12px;
+			padding: 14px 16px;
+			border: 1px solid rgba(200, 245, 66, 0.22);
+			border-radius: 8px;
+			background: rgba(200, 245, 66, 0.07);
+		}
+		.freshness span {
+			color: var(--green);
+			font-family: "Space Mono", monospace;
+			font-size: 0.78rem;
+			font-weight: 820;
+			letter-spacing: 0.08em;
+			text-transform: uppercase;
+		}
+		.progress-list {
+			display: grid;
+			gap: 14px;
+		}
+		.progress-row {
+			display: grid;
+			grid-template-columns: minmax(130px, 0.45fr) minmax(160px, 1fr) auto;
+			gap: 12px;
+			align-items: center;
+		}
+		.progress-row strong,
+		.progress-row small {
+			display: block;
+		}
+		.progress-row small {
+			margin-top: 4px;
+			color: var(--muted);
+			font-size: 0.78rem;
+			line-height: 1.35;
+		}
+		.progress-track {
+			height: 10px;
+			overflow: hidden;
+			border-radius: 999px;
+			background: rgba(245, 242, 236, 0.09);
+		}
+		.progress-track span {
+			display: block;
+			height: 100%;
+			border-radius: inherit;
+			background: linear-gradient(90deg, var(--green), var(--amber));
+		}
+		.metric-value {
+			color: var(--green);
+			font-family: "Space Mono", monospace;
+			font-size: 0.9rem;
+			font-weight: 820;
+			white-space: nowrap;
+		}
+		.bar-chart {
+			display: grid;
+			grid-template-columns: repeat(7, minmax(20px, 1fr));
+			align-items: end;
+			gap: 10px;
+			height: 210px;
+			padding-top: 10px;
+		}
+		.bar-column {
+			display: grid;
+			grid-template-rows: 1fr auto;
+			gap: 8px;
+			height: 100%;
+		}
+		.bar-column i {
+			align-self: end;
+			min-height: 12px;
+			border-radius: 8px 8px 0 0;
+			background: linear-gradient(180deg, var(--green), rgba(200, 245, 66, 0.32));
+		}
+		.bar-column small,
+		.chart-legend {
+			color: var(--muted);
+			font-family: "Space Mono", monospace;
+			font-size: 0.72rem;
+			text-align: center;
+		}
+		.score-ring {
+			display: grid;
+			width: min(220px, 100%);
+			aspect-ratio: 1;
+			margin: 0 auto;
+			place-items: center;
+			border-radius: 999px;
+			background:
+				radial-gradient(circle at center, var(--panel) 0 58%, transparent 59%),
+				conic-gradient(var(--green) var(--score), rgba(245, 242, 236, 0.1) 0);
+		}
+		.score-ring strong {
+			display: block;
+			color: var(--text);
+			font-size: 2.4rem;
+			text-align: center;
+		}
+		.score-ring span {
+			display: block;
+			width: 140px;
+			color: var(--muted);
+			font-size: 0.86rem;
+			line-height: 1.35;
+			text-align: center;
+		}
+		.chart-panel svg {
+			width: 100%;
+			height: auto;
+			overflow: visible;
+		}
+		.chart-panel text {
+			fill: var(--muted);
+			font-family: "Space Mono", monospace;
+			font-size: 12px;
+		}
+		.chart-grid-line {
+			stroke: rgba(245, 242, 236, 0.1);
+			stroke-width: 1;
+		}
+		.pattern-list {
+			display: grid;
+			gap: 12px;
+		}
+		.pattern-card {
+			padding: 16px;
+			border: 1px solid rgba(245, 242, 236, 0.1);
+			border-radius: 8px;
+			background: rgba(245, 242, 236, 0.04);
+		}
+		.pattern-card strong,
+		.pattern-card small {
+			display: block;
+		}
+		.pattern-card small {
+			color: var(--green);
+			font-family: "Space Mono", monospace;
+			font-size: 0.72rem;
+			font-weight: 820;
+			letter-spacing: 0.08em;
+			text-transform: uppercase;
+		}
+		.report-preview {
+			overflow: auto;
+			margin: 0;
+			padding: 16px;
+			border: 1px solid rgba(245, 242, 236, 0.1);
+			border-radius: 8px;
+			background: rgba(0, 0, 0, 0.25);
+			color: var(--muted);
+			font: 0.92rem/1.6 "Space Mono", monospace;
+		}
 		#message { min-height: 24px; margin-top: 14px; color: var(--green); font-weight: 760; }
 		footer {
 			padding: 36px 0;
@@ -878,6 +1048,8 @@ function settingsShell(title: string, body: string): string {
 			.hero, .row, .qr-link-panel { grid-template-columns: 1fr; }
 			nav .shell { align-items: flex-start; flex-direction: column; padding: 14px 0; }
 			h1 { font-size: clamp(3rem, 18vw, 4.2rem); }
+			.progress-row { grid-template-columns: 1fr; }
+			.metric-value { white-space: normal; }
 		}
 	</style>
 </head>
@@ -889,9 +1061,13 @@ function settingsShell(title: string, body: string): string {
 			</a>
 			<div class="nav-links">
 				<a class="button" href="/my-day">My day</a>
+				<a class="button" href="/my-week">My week</a>
+				<a class="button" href="/my-fitness">Fitness</a>
 				<a class="button" href="/settings">Settings</a>
 				<a class="button" href="/connections">Connections</a>
 				<a class="button" href="/coach">Coach chat</a>
+				<a class="button" href="/diagnostics">Diagnostics</a>
+				<a class="button" href="/reports">Reports</a>
 			</div>
 		</div>
 	</nav>
@@ -1846,6 +2022,433 @@ function renderTimelineItem(item: MyDayTimelineItem): string {
 	</article>`;
 }
 
+type WeeklyLoadPoint = {
+	label: string;
+	load: number;
+	protein: number;
+	recovery: number;
+};
+
+type TrendPoint = {
+	label: string;
+	atl: number;
+	ctl: number;
+	tsb: number;
+	protein: number;
+	weight: number;
+	targetWeight: number;
+};
+
+function renderFreshnessPanel(label = "Generated from current request"): string {
+	return `<div class="freshness">
+		<span>${escapeHtml(label)}</span>
+		<a class="button" href="">Refresh</a>
+	</div>`;
+}
+
+function renderBarChart(points: WeeklyLoadPoint[], key: keyof WeeklyLoadPoint): string {
+	const values = points
+		.map((point) => (typeof point[key] === "number" ? point[key] : 0))
+		.filter((value): value is number => typeof value === "number");
+	const max = Math.max(...values, 1);
+	return `<div class="bar-chart" aria-label="${escapeHtml(String(key))} by day">
+		${points
+			.map((point) => {
+				const value = typeof point[key] === "number" ? point[key] : 0;
+				return `<div class="bar-column">
+					<i style="height: ${Math.max(8, Math.round((value / max) * 100))}%"></i>
+					<small>${escapeHtml(point.label)}</small>
+				</div>`;
+			})
+			.join("")}
+	</div>`;
+}
+
+function linePoints(values: number[], min: number, max: number, width: number, height: number): string {
+	const xStep = (width - 80) / Math.max(values.length - 1, 1);
+	const span = Math.max(max - min, 1);
+	return values
+		.map((value, index) => {
+			const x = 40 + index * xStep;
+			const y = 24 + (1 - (value - min) / span) * (height - 58);
+			return `${x},${y}`;
+		})
+		.join(" ");
+}
+
+function renderLineChart(
+	points: TrendPoint[],
+	series: Array<{ key: keyof TrendPoint; label: string; color: string; dashed?: boolean }>,
+	min: number,
+	max: number,
+): string {
+	const width = 720;
+	const height = 260;
+	return `<div class="chart-panel">
+		<div class="chart-legend">${series.map((item) => `${escapeHtml(item.label)}`).join(" · ")}</div>
+		<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(series.map((item) => item.label).join(", "))} trend">
+			${[42, 84, 126, 168, 210]
+				.map((y) => `<line class="chart-grid-line" x1="24" x2="696" y1="${y}" y2="${y}"></line>`)
+				.join("")}
+			${series
+				.map((item) => {
+					const values = points.map((point) => Number(point[item.key]));
+					return `<polyline points="${linePoints(values, min, max, width, height)}" fill="none" stroke="${item.color}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" ${item.dashed ? `stroke-dasharray="8 8"` : ""}></polyline>`;
+				})
+				.join("")}
+			${points
+				.map((point, index) => `<text x="${40 + index * 128}" y="248" text-anchor="middle">${escapeHtml(point.label)}</text>`)
+				.join("")}
+		</svg>
+	</div>`;
+}
+
+function firstMetricSeries(
+	context: HealthContextBundle,
+	categories: HealthDataCategory[],
+	patterns: RegExp[],
+): number[] {
+	for (const pattern of patterns) {
+		const values = categories.flatMap((category) => metricSeries(context, category, pattern));
+		if (values.length) return values;
+	}
+	return [];
+}
+
+function labelForIndex(index: number, total: number): string {
+	if (total <= 7) {
+		return ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][index] ?? `D${index + 1}`;
+	}
+	return `W${index + 1}`;
+}
+
+function realWeeklyLoad(context: HealthContextBundle): WeeklyLoadPoint[] {
+	const activities = [
+		...arrayFrom(contextFor(context, "fitness_activities")?.data),
+		...arrayFrom(contextFor(context, "gym_workouts")?.data),
+		...arrayFrom(contextFor(context, "steps")?.data),
+	];
+	const nutrition = nutritionDays(context);
+	const recovery = firstMetricSeries(context, ["recovery", "hrv"], [
+		/recovery.*score|readiness.*score|score/i,
+		/^(hrv|hrv_rmssd|rmssd|hrv_sdnn)$/i,
+	]);
+	const loadValues = activities
+		.map(activityLoadFrom)
+		.filter((value): value is number => value !== undefined && value > 0);
+	const count = Math.max(loadValues.length, nutrition.length, recovery.length);
+	if (!count) return [];
+	const start = Math.max(0, count - 7);
+	return Array.from({ length: Math.min(7, count - start) }, (_, index) => {
+		const sourceIndex = start + index;
+		const nutritionDay = nutrition[sourceIndex] ?? nutrition[nutrition.length - Math.min(7, count - start) + index];
+		return {
+			label: nutritionDay?.date?.slice(5) ?? labelForIndex(index, Math.min(7, count - start)),
+			load: Math.round(loadValues[sourceIndex] ?? 0),
+			protein: Math.round(nutritionDay?.protein ?? 0),
+			recovery: Math.round(recovery[sourceIndex] ?? 0),
+		};
+	});
+}
+
+function renderGoalTracking(
+	context: HealthContextBundle,
+	preferences: ScorePreferences,
+): string {
+	const goals: Array<{ label: string; value: string; target: string; progress: number; drift: string }> = [];
+	const days = nutritionDays(context);
+	const proteinValues = days
+		.map((day) => day.protein)
+		.filter((value): value is number => value !== undefined);
+	const proteinAverage = average(proteinValues);
+	if (proteinAverage !== undefined) {
+		goals.push({
+			label: "Weekly protein",
+			value: `${Math.round(proteinAverage)}g avg`,
+			target: `${preferences.proteinTargetG}g`,
+			progress: Math.min(100, Math.round((proteinAverage / preferences.proteinTargetG) * 100)),
+			drift: `${proteinValues.length} logged day${proteinValues.length === 1 ? "" : "s"}`,
+		});
+	}
+	const loadValues = [
+		...arrayFrom(contextFor(context, "fitness_activities")?.data),
+		...arrayFrom(contextFor(context, "gym_workouts")?.data),
+	].map(activityLoadFrom).filter((value): value is number => value !== undefined && value > 0);
+	const latestLoad = loadValues[loadValues.length - 1];
+	const loadBaseline = average(loadValues.slice(0, -1));
+	if (latestLoad !== undefined) {
+		goals.push({
+			label: "Training load",
+			value: `${Math.round(latestLoad)} latest`,
+			target: loadBaseline !== undefined ? `${Math.round(loadBaseline)} baseline` : "baseline pending",
+			progress: loadBaseline ? Math.min(100, Math.round((latestLoad / Math.max(loadBaseline, 1)) * 70)) : 50,
+			drift: trendPhrase(percentDelta(latestLoad, loadBaseline)),
+		});
+	}
+	const weightValues = firstMetricSeries(context, ["nutrition", "recovery"], [
+		/body.*weight|weight_kg|weight_lb|weight/i,
+	]);
+	const latestWeight = weightValues[weightValues.length - 1];
+	const weightBaseline = average(weightValues.slice(0, -1));
+	if (latestWeight !== undefined) {
+		goals.push({
+			label: "Body weight",
+			value: formatMetric(latestWeight),
+			target: "target not set",
+			progress: 50,
+			drift: trendPhrase(percentDelta(latestWeight, weightBaseline)),
+		});
+	}
+	if (!goals.length) {
+		return `<p>No real goal data is available yet. Connect Cronometer for protein targets, Intervals.icu or Strava for load, and a weight source for body composition.</p>`;
+	}
+	return `<div class="progress-list">
+		${goals
+			.map(
+				(goal) => `<div class="progress-row">
+					<div>
+						<strong>${escapeHtml(goal.label)}</strong>
+						<small>${escapeHtml(goal.value)} · ${escapeHtml(goal.target)}</small>
+					</div>
+					<div class="progress-track"><span style="width: ${goal.progress}%"></span></div>
+					<span class="metric-value">${escapeHtml(goal.drift)}</span>
+				</div>`,
+			)
+			.join("")}
+	</div>`;
+}
+
+function renderPreWorkoutBrief(readinessScore: number): string {
+	const sessionGuidance =
+		readinessScore >= 75
+			? "Train as planned, cap hard sets before form breaks."
+			: readinessScore >= 62
+				? "Keep the session, but lower total volume by 10-15%."
+				: "Swap high intensity for technique, mobility, or zone 2.";
+	return `<div class="feature-grid">
+		<article class="panel feature-card">
+			<span class="status">30-60 min before</span>
+			<h3>Pre-workout brief</h3>
+			<p>${escapeHtml(sessionGuidance)} Readiness score is ${readinessScore}, so the coach should bias toward useful work over bravado.</p>
+		</article>
+		<article class="panel feature-card">
+			<span class="status">Fuel note</span>
+			<h3>Protein plus fast carbs</h3>
+			<p>Target 30g protein and 35-45g carbs before training. Post-session, add sodium and keep dinner aligned with the deficit.</p>
+		</article>
+	</div>`;
+}
+
+function renderPatternCards(context: HealthContextBundle): string {
+	const loadValues = [
+		...arrayFrom(contextFor(context, "fitness_activities")?.data),
+		...arrayFrom(contextFor(context, "gym_workouts")?.data),
+	].map(activityLoadFrom).filter((value): value is number => value !== undefined && value > 0);
+	const hrv = firstMetricSeries(context, ["hrv", "recovery"], [
+		/^(hrv|hrv_rmssd|rmssd|hrv_sdnn)$/i,
+	]);
+	const days = nutritionDays(context);
+	const candidates: Array<{ title: string; meta: string; text: string }> = [];
+	if (loadValues.length >= 4 && hrv.length >= 4) {
+		const latestLoad = loadValues[loadValues.length - 1];
+		const loadBaseline = average(loadValues.slice(0, -1));
+		const latestHrv = hrv[hrv.length - 1];
+		const hrvBaseline = average(hrv.slice(0, -1));
+		candidates.push({
+			title: "Training load vs recovery",
+			meta: `Candidate pattern · ${Math.min(loadValues.length, hrv.length)} real points`,
+			text: `Latest load is ${trendPhrase(percentDelta(latestLoad, loadBaseline))}; latest HRV is ${trendPhrase(percentDelta(latestHrv, hrvBaseline))}. More history is needed before calling this reliable.`,
+		});
+	}
+	if (days.length >= 4) {
+		const proteinValues = days
+			.map((day) => day.protein)
+			.filter((value): value is number => value !== undefined);
+		const calories = days
+			.map((day) => day.calories)
+			.filter((value): value is number => value !== undefined);
+		if (proteinValues.length >= 4) {
+			candidates.push({
+				title: "Protein consistency",
+				meta: `Candidate pattern · ${proteinValues.length} Cronometer days`,
+				text: `Average protein is ${formatMetric(average(proteinValues), "g")}. Average calories are ${formatMetric(average(calories), " kcal")}.`,
+			});
+		}
+	}
+	if (!candidates.length) {
+		return `<p>Pattern detection is waiting for real 4-8 week history. Connect and route Cronometer, Intervals.icu, Strava, Hevy, HRV, and sleep data to unlock learned correlations.</p>`;
+	}
+	return `<div class="pattern-list">
+		${candidates
+			.map(
+				(pattern) => `<article class="pattern-card">
+					<small>${escapeHtml(pattern.meta)}</small>
+					<strong>${escapeHtml(pattern.title)}</strong>
+					<p>${escapeHtml(pattern.text)}</p>
+				</article>`,
+			)
+			.join("")}
+	</div>`;
+}
+
+function renderMorningBrief(context: HealthContextBundle, scores: ScoreSummary): string {
+	const macro = nutritionMacroLine(context);
+	const nutritionReady = contextFor(context, "nutrition")?.status === "ready";
+	return `<div class="feature-grid">
+		<article class="panel feature-card">
+			<span class="status">Morning briefing</span>
+			<h3>Yesterday, readiness, priority.</h3>
+			<p>${escapeHtml(macro ? `Current nutrition read: ${macro}. ` : "Nutrition read is not available yet. ")}Overall score is ${scores.overall.score}; priority action is ${escapeHtml(motivationalMessage(scores))}</p>
+		</article>
+		<article class="panel feature-card">
+			<span class="status">Missed check-in nudge</span>
+			<h3>One message, configurable off.</h3>
+			<p>${nutritionReady ? "Cronometer returned data for this routed window, so no nutrition check-in nudge is needed from this page state." : "Cronometer data is missing for this routed window, so a single noon check-in nudge would be eligible if enabled."}</p>
+		</article>
+	</div>`;
+}
+
+type Answerability = "ready" | "partial" | "not_ready";
+
+interface QuestionDiagnostic {
+	question: string;
+	answerability: Answerability;
+	confidence: "High" | "Medium" | "Low";
+	coveragePercent: number;
+	requiredCategories: HealthDataCategory[];
+	available: string[];
+	missing: string[];
+	assumptions: string[];
+	fixes: Array<{ label: string; href: string }>;
+	safePreview: string;
+}
+
+function categoriesForQuestion(question: string): HealthDataCategory[] {
+	const normalized = question.toLowerCase();
+	const categories = new Set<HealthDataCategory>();
+	const add = (items: HealthDataCategory[]) => items.forEach((item) => categories.add(item));
+	if (/hrv|recovery|readiness|rest|sleep|strain|train hard|training hard/i.test(normalized)) {
+		add(["hrv", "sleep", "recovery", "fitness_activities"]);
+	}
+	if (/protein|calorie|macro|nutrition|meal|fuel|food|cronometer|deficit/i.test(normalized)) {
+		add(["nutrition"]);
+	}
+	if (/workout|lift|run|ride|training load|atl|ctl|tsb|hevy|strava|intervals/i.test(normalized)) {
+		add(["fitness_activities", "gym_workouts", "recovery"]);
+	}
+	if (/weight|body fat|body composition|scale|cut|six-pack|six pack/i.test(normalized)) {
+		add(["nutrition", "recovery"]);
+	}
+	if (/report|weekly|pattern|trend|why did|what caused|cause|rca/i.test(normalized)) {
+		add(["nutrition", "hrv", "sleep", "fitness_activities", "gym_workouts", "recovery"]);
+	}
+	if (!categories.size) add(["nutrition", "fitness_activities", "recovery"]);
+	return Array.from(categories);
+}
+
+function buildQuestionDiagnostic(
+	question: string,
+	context: HealthContextBundle,
+	requiredCategoriesOverride?: HealthDataCategory[],
+): QuestionDiagnostic {
+	const requiredCategories = requiredCategoriesOverride?.length
+		? requiredCategoriesOverride
+		: categoriesForQuestion(question);
+	const required = requiredCategories.map((category) => ({
+		category,
+		context: contextFor(context, category),
+	}));
+	const available = required
+		.filter((item) => item.context?.status === "ready")
+		.map((item) => `${categoryLabel(item.category)} via ${PROVIDER_LABELS[item.context?.provider ?? "manual"]}`);
+	const missing = required
+		.filter((item) => item.context?.status !== "ready")
+		.map((item) => {
+			const provider = item.context?.provider ? PROVIDER_LABELS[item.context.provider] : "No provider";
+			const note = item.context?.note ? `: ${item.context.note}` : "";
+			return `${categoryLabel(item.category)} (${provider}, ${item.context?.status ?? "missing"}${note})`;
+		});
+	const coveragePercent = Math.round((available.length / Math.max(required.length, 1)) * 100);
+	const answerability: Answerability =
+		coveragePercent >= 85 ? "ready" : coveragePercent >= 35 ? "partial" : "not_ready";
+	const confidence = answerability === "ready" ? "High" : answerability === "partial" ? "Medium" : "Low";
+	const assumptions =
+		answerability === "ready"
+			? ["ZorFit can answer using current routed source data, but should still mention uncertainty and avoid medical advice."]
+			: [
+					`ZorFit would answer with ${coveragePercent}% of required evidence.`,
+					"Any coach response should name missing inputs instead of filling gaps.",
+				];
+	const fixes = [
+		{ label: "Connections", href: "/connections" },
+		{ label: "Data routing", href: "/settings/data-routing" },
+		{ label: "Scoring", href: "/settings/scoring" },
+	];
+	const safePreview =
+		answerability === "ready"
+			? "Ready to answer with connected evidence. The response should cite the available categories and keep recommendations practical."
+			: answerability === "partial"
+				? "Partial answer only. ZorFit can give a cautious answer, but should say which data is missing."
+				: "Not enough data to answer accurately. ZorFit should ask the user to connect or route missing sources first.";
+	return {
+		question,
+		answerability,
+		confidence,
+		coveragePercent,
+		requiredCategories,
+		available,
+		missing,
+		assumptions,
+		fixes,
+		safePreview,
+	};
+}
+
+function renderQuestionDiagnostic(diagnostic: QuestionDiagnostic): string {
+	const statusLabel =
+		diagnostic.answerability === "ready"
+			? "Ready to answer"
+			: diagnostic.answerability === "partial"
+				? "Partial answer only"
+				: "Not enough data";
+	return `<section class="section" id="question-diagnostic">
+		<div class="section-head">
+			<div>
+				<span class="eyebrow">Question diagnostics</span>
+				<h2>${statusLabel}.</h2>
+			</div>
+			<p>${diagnostic.coveragePercent}% evidence coverage · ${diagnostic.confidence} confidence</p>
+		</div>
+		<div class="grid">
+			<article class="panel">
+				<span class="status">Question</span>
+				<h3>${escapeHtml(diagnostic.question)}</h3>
+				<p>${escapeHtml(diagnostic.safePreview)}</p>
+			</article>
+			<article class="panel">
+				<span class="status">Required data</span>
+				<ul class="guidance">${diagnostic.requiredCategories.map((category) => `<li>${escapeHtml(categoryLabel(category))}</li>`).join("")}</ul>
+			</article>
+			<article class="panel">
+				<span class="status">Available evidence</span>
+				${diagnostic.available.length ? `<ul class="guidance">${diagnostic.available.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>` : "<p>No required evidence is currently ready.</p>"}
+			</article>
+			<article class="panel">
+				<span class="status">Missing or weak evidence</span>
+				${diagnostic.missing.length ? `<ul class="guidance">${diagnostic.missing.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>` : "<p>No required categories are missing.</p>"}
+			</article>
+			<article class="panel">
+				<span class="status">Assumptions</span>
+				<ul class="guidance">${diagnostic.assumptions.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+			</article>
+			<article class="panel">
+				<span class="status">Fix this answer</span>
+				<div class="actions">${diagnostic.fixes.map((fix) => `<a class="button" href="${fix.href}">${escapeHtml(fix.label)}</a>`).join("")}</div>
+			</article>
+		</div>
+	</section>`;
+}
+
 const AI_PROVIDER_DEFAULTS: Record<
 	AiProviderId,
 	{ baseUrl: string; model: string; help: string }
@@ -1887,7 +2490,27 @@ const AI_PROVIDER_DEFAULTS: Record<
 	},
 };
 
-utilityRoutes.get("/settings", (c) => {
+utilityRoutes.get("/settings", async (c) => {
+	const session = await getSettingsSession(c);
+	const [serviceStatuses, aiSummaries, telegram] = session
+		? await Promise.all([
+				getZorFitServiceStatuses(c.env, session),
+				listAiConnectionSummaries(c.env, session),
+				getTelegramConnection(c.env, session),
+			])
+		: [[], [], null] as const;
+	const connectedSources = serviceStatuses.filter((status) => status.configured).length;
+	const connectedAi = aiSummaries.filter((summary) => summary.enabled).length;
+	const telegramReady = Boolean(telegram?.enabled && telegram.externalUserId);
+	const nextStep = !session
+		? { label: "Sign in to start setup", href: "/signin" }
+		: connectedSources === 0
+			? { label: "Connect your first source", href: "/settings/sources" }
+			: connectedAi === 0
+				? { label: "Add an AI provider", href: "/settings/ai" }
+				: !telegramReady
+					? { label: "Connect Telegram", href: "/settings/messages" }
+					: { label: "Ask your first question", href: "/coach" };
 	const categories: SettingsCard[] = [
 		{
 			id: "sources",
@@ -1900,7 +2523,7 @@ utilityRoutes.get("/settings", (c) => {
 		{
 			id: "routing",
 			label: "Data Routing",
-			status: "New",
+			status: "Routing",
 			description:
 				"Choose where ZorFit should read HRV, sleep, nutrition, steps, workouts, and recovery from.",
 			href: "/settings/data-routing",
@@ -1933,13 +2556,14 @@ utilityRoutes.get("/settings", (c) => {
 	const body = `<main class="shell">
 		<section class="hero">
 			<div>
-				<span class="eyebrow">Control center</span>
-				<h1>Settings for sources, AI, and messages.</h1>
-				<p class="lede">Start with one of the three setup areas. Each area opens into provider cards where users can add the right details in the right place.</p>
+				<span class="eyebrow">Setup hub</span>
+				<h1>Connect what ZorFit needs to coach.</h1>
+				<p class="lede">${session ? `${connectedSources} source${connectedSources === 1 ? "" : "s"} connected · ${connectedAi} AI key${connectedAi === 1 ? "" : "s"} · Telegram ${telegramReady ? "connected" : "not set"}.` : "Sign in to see source, AI, and Telegram setup status."}</p>
 			</div>
 			<div class="panel">
-				<strong>Simple setup path</strong>
-				<p>Fitness credentials, AI keys, and messaging services stay separated so the page stays clear as ZorFit grows.</p>
+				<strong>Recommended next step</strong>
+				<p>${escapeHtml(nextStep.label)}</p>
+				<a class="button primary" href="${nextStep.href}">Continue setup</a>
 			</div>
 		</section>
 		<section class="section">
@@ -1970,20 +2594,26 @@ utilityRoutes.get("/settings/scoring", async (c) => {
 		<section class="section">
 			<div class="actions"><a class="button" href="/settings">Back to settings</a><a class="button" href="/my-day">Open My Day</a></div>
 			<form class="panel" id="scoreForm">
+				<div class="actions">
+					<button type="button" data-preset="balanced">Balanced</button>
+					<button type="button" data-preset="athlete">Athlete</button>
+					<button type="button" data-preset="weight_loss">Weight loss</button>
+					<span class="status" id="weightTotal">Weights total 100%</span>
+				</div>
 				<div class="row">
 					<div>
 						<label>Nutrition weight</label>
-						<input name="nutritionWeight" type="number" min="0" max="100" value="${preferences.nutritionWeight}">
+						<input name="nutritionWeight" type="range" min="0" max="100" value="${preferences.nutritionWeight}">
 					</div>
 					<div>
 						<label>Readiness weight</label>
-						<input name="readinessWeight" type="number" min="0" max="100" value="${preferences.readinessWeight}">
+						<input name="readinessWeight" type="range" min="0" max="100" value="${preferences.readinessWeight}">
 					</div>
 				</div>
 				<div class="row">
 					<div>
 						<label>Fitness weight</label>
-						<input name="fitnessWeight" type="number" min="0" max="100" value="${preferences.fitnessWeight}">
+						<input name="fitnessWeight" type="range" min="0" max="100" value="${preferences.fitnessWeight}">
 					</div>
 					<div>
 						<label>Sleep target hours</label>
@@ -2009,10 +2639,35 @@ utilityRoutes.get("/settings/scoring", async (c) => {
 		</section>
 	</main>
 	<script>
+		const presets = {
+			balanced: { nutritionWeight: 35, readinessWeight: 35, fitnessWeight: 30, proteinTargetG: 100, sugarLimitG: 25, fiberTargetG: 25, sleepTargetHours: 7 },
+			athlete: { nutritionWeight: 25, readinessWeight: 40, fitnessWeight: 35, proteinTargetG: 130, sugarLimitG: 35, fiberTargetG: 30, sleepTargetHours: 7.5 },
+			weight_loss: { nutritionWeight: 45, readinessWeight: 30, fitnessWeight: 25, proteinTargetG: 120, sugarLimitG: 25, fiberTargetG: 30, sleepTargetHours: 7 }
+		};
+		function updateWeightTotal() {
+			const form = document.getElementById("scoreForm");
+			const total = ["nutritionWeight", "readinessWeight", "fitnessWeight"].reduce((sum, name) => sum + Number(form.elements[name].value || 0), 0);
+			document.getElementById("weightTotal").textContent = "Weights total " + total + "%";
+		}
+		document.getElementById("scoreForm")?.addEventListener("input", updateWeightTotal);
+		document.querySelectorAll("[data-preset]").forEach((button) => {
+			button.addEventListener("click", () => {
+				const form = document.getElementById("scoreForm");
+				const preset = presets[button.dataset.preset];
+				Object.entries(preset).forEach(([key, value]) => { form.elements[key].value = value; });
+				updateWeightTotal();
+			});
+		});
 		document.getElementById("scoreForm")?.addEventListener("submit", async (event) => {
 			event.preventDefault();
 			const form = event.currentTarget;
 			const payload = Object.fromEntries(new FormData(form).entries());
+			const total = Number(payload.nutritionWeight || 0) + Number(payload.readinessWeight || 0) + Number(payload.fitnessWeight || 0);
+			if (total > 0 && total !== 100) {
+				payload.nutritionWeight = Math.round((Number(payload.nutritionWeight || 0) / total) * 100);
+				payload.readinessWeight = Math.round((Number(payload.readinessWeight || 0) / total) * 100);
+				payload.fitnessWeight = Math.max(0, 100 - Number(payload.nutritionWeight) - Number(payload.readinessWeight));
+			}
 			const response = await fetch("/api/score-preferences", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
@@ -2021,6 +2676,7 @@ utilityRoutes.get("/settings/scoring", async (c) => {
 			const data = await response.json().catch(() => ({}));
 			document.getElementById("message").textContent = response.ok ? "Saved score formula." : (data.error || "Could not save score formula.");
 		});
+		updateWeightTotal();
 	</script>`;
 	return c.html(settingsShell("Score Formula", body));
 });
@@ -2038,13 +2694,36 @@ utilityRoutes.get("/settings/sources", async (c) => {
 	const cards = SOURCE_SETTINGS.map((source) => {
 		const status = statusMap.get(source.id);
 		const isComingSoon = source.authType === "coming_soon";
+		const authLabel =
+			source.authType === "oauth"
+				? "OAuth"
+				: source.authType === "api_key"
+					? "API key"
+					: source.authType === "username_password"
+						? "Username + password"
+						: "Planned";
+		const setupTime =
+			source.id === "strava" || source.id === "hevy" || source.id === "intervals_icu"
+				? "~2 min setup"
+				: source.id === "cronometer"
+					? "~1 min setup"
+					: source.authType === "oauth"
+						? "Requires app/OAuth setup"
+						: "Future connector";
 		return {
 			...source,
 			status: isComingSoon
 				? "Coming soon"
 				: session
 					? statusLabel(status?.source)
-					: "Sign in required",
+					: authLabel,
+			guidance: [
+				`Auth type: ${authLabel}`,
+				`Estimated setup: ${setupTime}`,
+				source.authType === "oauth"
+					? "OAuth sources may require provider app approval before public use."
+					: source.helpText,
+			],
 		};
 	});
 	const body = `<main class="shell">
@@ -2247,6 +2926,18 @@ utilityRoutes.get("/settings/messages", async (c) => {
 				: "Setup pending"
 			: "Sign in required",
 	}));
+	const allCards = [
+		...cards,
+		{
+			id: "whatsapp",
+			label: "WhatsApp",
+			status: "Future",
+			description:
+				"Placeholder for future WhatsApp delivery after the Telegram flow is stable.",
+			href: "/settings/messages",
+			guidance: ["Future channel", "Likely requires WhatsApp Business API setup."],
+		},
+	];
 	const body = `<main class="shell">
 		<section class="hero">
 			<div>
@@ -2261,7 +2952,30 @@ utilityRoutes.get("/settings/messages", async (c) => {
 		</section>
 		<section class="section">
 			<div class="actions"><a class="button" href="/settings">Back to settings</a></div>
-			<div class="grid">${renderSettingsCards(cards)}</div>
+			<div class="grid">${renderSettingsCards(allCards)}</div>
+		</section>
+		<section class="section">
+			<div class="section-head">
+				<div>
+					<span class="eyebrow">Preview</span>
+					<h2>What users receive.</h2>
+				</div>
+				<p>Scheduled messages use the same concise format before they are delivered to Telegram.</p>
+			</div>
+			<div class="panel">
+				<pre class="report-preview">ZorFit nutrition check-in
+
+Date: 2026-06-06
+Data check: Cronometer nutrition retrieved for this insight.
+
+Protein is behind target and sugar is high for this time of day.
+Next meal: lean protein, fiber, and steady carbs. Skip the extra sweet snack.
+
+Not medical advice. Consult a qualified professional for health or nutrition decisions.</pre>
+				<div class="actions">
+					<a class="button primary" href="/settings/messaging/telegram">Configure Telegram</a>
+				</div>
+			</div>
 		</section>
 	</main>`;
 	return c.html(settingsShell("Messages", body));
@@ -2909,6 +3623,7 @@ utilityRoutes.get("/coach", async (c) => {
 				<a class="button" href="/settings/data-routing">Data routing</a>
 				<a class="button" href="/settings/ai">AI settings</a>
 				<a class="button" href="/settings/messages">Messages</a>
+				<a class="button" id="diagnoseQuestion" href="/diagnostics">Diagnose question</a>
 			</div>
 			<div class="panel">
 				<label>Use these data categories</label>
@@ -2955,8 +3670,20 @@ utilityRoutes.get("/coach", async (c) => {
 		}
 		document.getElementById("coachCategories").addEventListener("change", refreshBank);
 		document.getElementById("coachQuestionBank").addEventListener("click", (event) => {
-			if (event.target.dataset?.question) form.elements.question.value = event.target.dataset.question;
+			if (event.target.dataset?.question) {
+				form.elements.question.value = event.target.dataset.question;
+				updateDiagnosticLink();
+			}
 		});
+		function updateDiagnosticLink() {
+			const question = form.elements.question.value.trim();
+			const params = new URLSearchParams();
+			if (question) params.set("q", question);
+			for (const category of selectedCategories()) params.append("category", category);
+			document.getElementById("diagnoseQuestion").href = "/diagnostics" + (params.toString() ? "?" + params.toString() : "");
+		}
+		form.elements.question.addEventListener("input", updateDiagnosticLink);
+		document.getElementById("coachCategories").addEventListener("change", updateDiagnosticLink);
 		form?.addEventListener("submit", async (event) => {
 			event.preventDefault();
 			const question = form.elements.question.value.trim();
@@ -2973,9 +3700,65 @@ utilityRoutes.get("/coach", async (c) => {
 			appendMessage(response.ok ? data.answer : (data.error || "Could not answer."), "");
 			document.getElementById("message").textContent = "";
 		});
+		updateDiagnosticLink();
 		refreshBank();
 	</script>`;
 	return c.html(settingsShell("Coach Chat", body));
+});
+
+utilityRoutes.get("/diagnostics", async (c) => {
+	const session = await getSettingsSession(c);
+	const question = normalizeMessageQuestion(
+		c.req.query("q") || "Can ZorFit answer my health and training question accurately right now?",
+	) ?? "Can ZorFit answer my health and training question accurately right now?";
+	if (!session) {
+		const body = `<main class="shell">
+			<section class="hero">
+				<div>
+					<span class="eyebrow">Question diagnostics</span>
+					<h1>Diagnose answer readiness.</h1>
+					<p class="lede">Sign in to check whether ZorFit has the right data to answer a specific health, nutrition, recovery, or training question.</p>
+				</div>
+				<div class="panel">
+					<strong>Sign in required</strong>
+					<p>Diagnostics check your connected sources and data routing before answering.</p>
+					<a class="button primary" href="/signin">Sign in</a>
+				</div>
+			</section>
+		</main>`;
+		return c.html(settingsShell("Diagnostics", body));
+	}
+	const timezone = normalizeTimezone(c.req.query("timezone") || "America/New_York");
+	const date = localDateForTimezone(timezone);
+	const selectedCategories = c.req.queries("category") ?? [];
+	const requiredCategories = selectedCategories.length
+		? normalizeHealthCategories(selectedCategories)
+		: categoriesForQuestion(question);
+	const context = await collectHealthContext(c.env, session, {
+		categories: requiredCategories,
+		timezone,
+		date,
+		rangeDays: /pattern|weekly|trend|cause|why/i.test(question) ? 42 : 7,
+	});
+	const diagnostic = buildQuestionDiagnostic(question, context, requiredCategories);
+	const body = `<main class="shell">
+		<section class="hero">
+			<div>
+				<span class="eyebrow">Question diagnostics</span>
+				<h1>Can ZorFit answer this?</h1>
+				<p class="lede">Question-level RCA for @${escapeHtml(session.login)}. It checks required evidence, missing data, assumptions, and fix links before the coach answers.</p>
+			</div>
+			<div class="panel">
+				<form method="GET">
+					<label for="q">Question</label>
+					<textarea id="q" name="q">${escapeHtml(question)}</textarea>
+					<div class="actions"><button class="primary" type="submit">Run diagnostics</button><a class="button" href="/coach">Back to coach</a></div>
+				</form>
+			</div>
+		</section>
+		${renderQuestionDiagnostic(diagnostic)}
+	</main>`;
+	return c.html(settingsShell("Diagnostics", body));
 });
 
 utilityRoutes.get("/my-day", async (c) => {
@@ -3083,6 +3866,36 @@ utilityRoutes.get("/my-day", async (c) => {
 		<section class="section">
 			<div class="section-head">
 				<div>
+					<span class="eyebrow">Targets</span>
+					<h2>Goal drift.</h2>
+				</div>
+				<p>The coach can now show whether today moves the 1-3 active goals closer or farther away.</p>
+			</div>
+			<div class="panel">${renderGoalTracking(context, scorePreferences)}</div>
+		</section>
+		<section class="section">
+			<div class="section-head">
+				<div>
+					<span class="eyebrow">Pre-workout</span>
+					<h2>Brief before the session.</h2>
+				</div>
+				<p>Use this as the 30-60 minute workout prompt when a scheduled session is detected.</p>
+			</div>
+			${renderPreWorkoutBrief(scores.readiness.score)}
+		</section>
+		<section class="section">
+			<div class="section-head">
+				<div>
+					<span class="eyebrow">Messaging</span>
+					<h2>Morning and missed check-ins.</h2>
+				</div>
+				<p>Extends the Telegram nutrition push into a fuller coach briefing.</p>
+			</div>
+			${renderMorningBrief(context, scores)}
+		</section>
+		<section class="section">
+			<div class="section-head">
+				<div>
 					<span class="eyebrow">Vitals</span>
 					<h2>Today at a glance.</h2>
 				</div>
@@ -3138,6 +3951,373 @@ utilityRoutes.get("/my-day", async (c) => {
 		</section>
 	</main>`;
 	return c.html(settingsShell("My Day So Far", body));
+});
+
+utilityRoutes.get("/my-week", async (c) => {
+	const session = await getSettingsSession(c);
+	if (!session) {
+		const body = `<main class="shell">
+			<section class="hero">
+				<div>
+					<span class="eyebrow">Weekly review</span>
+					<h1>Your week becomes a coach verdict.</h1>
+					<p class="lede">Sign in to summarize load, nutrition consistency, recovery highs and lows, and learned patterns across the last 4-8 weeks.</p>
+				</div>
+				<div class="panel">
+					<strong>Sign in required</strong>
+					<p>Weekly review uses your connected training, nutrition, and recovery sources.</p>
+					<a class="button primary" href="/signin">Sign in</a>
+				</div>
+			</section>
+		</main>`;
+		return c.html(settingsShell("My Week", body));
+	}
+	const timezone = normalizeTimezone(c.req.query("timezone") || "America/New_York");
+	const date = localDateForTimezone(timezone);
+	const [context, scorePreferences] = await Promise.all([
+		collectHealthContext(c.env, session, {
+			categories: [
+				"nutrition",
+				"hrv",
+				"sleep",
+				"fitness_activities",
+				"gym_workouts",
+				"steps",
+				"recovery",
+			],
+			timezone,
+			date,
+			rangeDays: 42,
+		}),
+		getScorePreferences(c.env, session),
+	]);
+	const scores = scoreSummary(context, scorePreferences);
+	const weeklyLoad = realWeeklyLoad(context);
+	const recoveryDays = weeklyLoad.filter((point) => point.recovery > 0);
+	const bestRecovery = recoveryDays.reduce<WeeklyLoadPoint | undefined>(
+		(best, point) => (!best || point.recovery > best.recovery ? point : best),
+		undefined,
+	);
+	const worstRecovery = recoveryDays.reduce<WeeklyLoadPoint | undefined>(
+		(worst, point) => (!worst || point.recovery < worst.recovery ? point : worst),
+		undefined,
+	);
+	const loadChart = weeklyLoad.some((point) => point.load > 0)
+		? renderBarChart(weeklyLoad, "load")
+		: `<p>No real training load records were returned by Intervals.icu, Strava, Hevy, or steps for this window.</p>`;
+	const body = `<main class="shell">
+		<section class="hero">
+			<div>
+				<span class="eyebrow">Weekly review</span>
+				<h1>Weekly review from connected data.</h1>
+				<p class="lede">Auto-generated weekly summary for @${escapeHtml(session.login)} from routed source data for ${escapeHtml(date)}.</p>
+			</div>
+			<div class="panel">
+				${renderFreshnessPanel()}
+				<div class="actions">
+					<a class="button primary" href="/reports">Export report</a>
+					<a class="button" href="/my-day">Back to My Day</a>
+				</div>
+			</div>
+		</section>
+		<section class="section">
+			<div class="section-head">
+				<div>
+					<span class="eyebrow">Load and consistency</span>
+					<h2>Seven-day read.</h2>
+				</div>
+				<p>Designed as the share-card source for retention and accountability.</p>
+			</div>
+			<div class="grid">
+				<article class="panel">
+					<h3>Training load trend</h3>
+					${loadChart}
+				</article>
+				<article class="panel">
+					<h3>Nutrition consistency</h3>
+					<div class="score-ring" style="--score: ${scores.nutrition.score}%">
+						<div><strong>${scores.nutrition.score}</strong><span>${escapeHtml(scoreBand(scores.nutrition.score))} from Cronometer/routed nutrition</span></div>
+					</div>
+				</article>
+				${renderKpiCard({
+					label: "Best recovery day",
+					value: bestRecovery?.label ?? "No data",
+					bottomLine: bestRecovery ? `${bestRecovery.recovery} recovery metric from routed data.` : "No recovery series returned by HRV/sleep/recovery sources.",
+					trend: bestRecovery ? "from real source data" : "connect recovery",
+				})}
+				${renderKpiCard({
+					label: "Lowest recovery day",
+					value: worstRecovery?.label ?? "No data",
+					bottomLine: worstRecovery ? `${worstRecovery.recovery} recovery metric from routed data.` : "No recovery series returned by HRV/sleep/recovery sources.",
+					trend: worstRecovery ? "from real source data" : "connect recovery",
+				})}
+			</div>
+		</section>
+		<section class="section">
+			<div class="section-head">
+				<div>
+					<span class="eyebrow">Pattern detection</span>
+					<h2>Not one-off insights.</h2>
+				</div>
+				<p>These are recurring correlations the coach can learn over 4-8 weeks.</p>
+			</div>
+			<div class="panel">${renderPatternCards(context)}</div>
+		</section>
+		<section class="section">
+			<div class="motivation">
+				<h3>One coach verdict</h3>
+				<p>${escapeHtml(motivationalMessage(scores))}</p>
+			</div>
+		</section>
+	</main>`;
+	return c.html(settingsShell("My Week", body));
+});
+
+utilityRoutes.get("/my-fitness", async (c) => {
+	const session = await getSettingsSession(c);
+	if (!session) {
+		const body = `<main class="shell">
+			<section class="hero">
+				<div>
+					<span class="eyebrow">Fitness trends</span>
+					<h1>Connect sources to see real trends.</h1>
+					<p class="lede">Training load, nutrition trend, and body composition only render after ZorFit can read your connected data.</p>
+				</div>
+				<div class="panel">
+					<strong>Sign in required</strong>
+					<p>Use Google or GitHub sign-in, then connect Intervals.icu, Cronometer, Strava, Hevy, or a weight source.</p>
+					<a class="button primary" href="/signin">Sign in</a>
+				</div>
+			</section>
+		</main>`;
+		return c.html(settingsShell("My Fitness", body));
+	}
+	const timezone = normalizeTimezone(c.req.query("timezone") || "America/New_York");
+	const date = localDateForTimezone(timezone);
+	const [context, scorePreferences] = await Promise.all([
+		collectHealthContext(c.env, session, {
+			categories: ["nutrition", "fitness_activities", "gym_workouts", "recovery", "hrv", "sleep"],
+			timezone,
+			date,
+			rangeDays: 42,
+		}),
+		getScorePreferences(c.env, session),
+	]);
+	const atl = firstMetricSeries(context, ["fitness_activities", "recovery"], [/^atl$|fatigue|acute.*load/i]);
+	const ctl = firstMetricSeries(context, ["fitness_activities", "recovery"], [/^ctl$|fitness|chronic.*load/i]);
+	const tsb = firstMetricSeries(context, ["fitness_activities", "recovery"], [/^tsb$|form|balance/i]);
+	const loadSeriesLength = Math.max(atl.length, ctl.length, tsb.length);
+	const loadTrendPoints: TrendPoint[] = Array.from({ length: Math.min(6, loadSeriesLength) }, (_, index) => {
+		const offset = Math.max(0, loadSeriesLength - 6) + index;
+		return {
+			label: `W${index + 1}`,
+			atl: Math.round(atl[offset] ?? 0),
+			ctl: Math.round(ctl[offset] ?? 0),
+			tsb: Math.round(tsb[offset] ?? 0),
+			protein: 0,
+			weight: 0,
+			targetWeight: 0,
+		};
+	});
+	const nutrition = nutritionDays(context);
+	const proteinValues = nutrition
+		.map((day) => day.protein)
+		.filter((value): value is number => value !== undefined);
+	const weightValues = firstMetricSeries(context, ["nutrition", "recovery"], [
+		/body.*weight|weight_kg|weight_lb|weight/i,
+	]);
+	const weightTrendPoints: TrendPoint[] = weightValues.slice(-6).map((weight, index) => ({
+		label: `W${index + 1}`,
+		atl: 0,
+		ctl: 0,
+		tsb: 0,
+		protein: 0,
+		weight,
+		targetWeight: weightValues.length ? weightValues[weightValues.length - 1] : weight,
+	}));
+	const body = `<main class="shell">
+		<section class="hero">
+			<div>
+				<span class="eyebrow">Fitness trends</span>
+				<h1>Training, nutrition, body comp.</h1>
+				<p class="lede">Signed in as @${escapeHtml(session.login)}. A cleaner coached read of Intervals.icu, Cronometer, and body composition signals without leaving ZorFit.</p>
+			</div>
+			<div class="panel">
+				${renderFreshnessPanel("Generated from current request")}
+				<p>Charts below are rendered only from data returned by connected ZorFit sources. Missing fields show as setup states.</p>
+			</div>
+		</section>
+		<section class="section">
+			<div class="section-head">
+				<div>
+					<span class="eyebrow">Training load</span>
+					<h2>ATL / CTL / TSB over six weeks.</h2>
+				</div>
+				<p>Native visibility for the load you already track mentally.</p>
+			</div>
+			<div class="panel">
+				${
+					loadTrendPoints.length && (atl.length || ctl.length || tsb.length)
+						? renderLineChart(
+								loadTrendPoints,
+								[
+									{ key: "atl", label: "ATL", color: "#c8f542" },
+									{ key: "ctl", label: "CTL", color: "#f5f2ec" },
+									{ key: "tsb", label: "TSB", color: "#ff5c1a" },
+								],
+								Math.min(-12, ...atl, ...ctl, ...tsb),
+								Math.max(20, ...atl, ...ctl, ...tsb),
+							)
+						: `<p>No ATL / CTL / TSB fields were returned by the connected fitness source. Connect Intervals.icu or route fitness activities to a source that provides training-load fields.</p>`
+				}
+			</div>
+		</section>
+		<section class="section">
+			<div class="grid">
+				<article class="panel">
+					<div class="section-head">
+						<div>
+							<span class="eyebrow">Nutrition trend</span>
+							<h2>Protein vs target.</h2>
+						</div>
+					</div>
+					<div class="progress-list">
+						${
+							proteinValues.length
+								? proteinValues.slice(-7).map(
+										(value, index) => `<div class="progress-row">
+											<div><strong>${nutrition[nutrition.length - proteinValues.slice(-7).length + index]?.date ?? `D${index + 1}`}</strong><small>${Math.round(value)}g protein</small></div>
+											<div class="progress-track"><span style="width: ${Math.min(100, Math.round((value / scorePreferences.proteinTargetG) * 100))}%"></span></div>
+											<span class="metric-value">${scorePreferences.proteinTargetG}g target</span>
+										</div>`,
+									).join("")
+								: `<p>No Cronometer protein trend was returned for this window.</p>`
+						}
+					</div>
+				</article>
+				<article class="panel">
+					<div class="section-head">
+						<div>
+							<span class="eyebrow">Body composition</span>
+							<h2>Weight trend.</h2>
+						</div>
+					</div>
+					${
+						weightTrendPoints.length
+							? renderLineChart(
+									weightTrendPoints,
+									[
+										{ key: "weight", label: "Weight", color: "#c8f542" },
+										{ key: "targetWeight", label: "Latest", color: "#aaa49a", dashed: true },
+									],
+									Math.min(...weightValues) - 1,
+									Math.max(...weightValues) + 1,
+								)
+							: `<p>No body-weight or body-composition series was returned by connected sources. Add a weight-capable source before showing this chart.</p>`
+					}
+				</article>
+			</div>
+		</section>
+	</main>`;
+	return c.html(settingsShell("My Fitness", body));
+});
+
+utilityRoutes.get("/reports", async (c) => {
+	const session = await getSettingsSession(c);
+	if (!session) {
+		const body = `<main class="shell">
+			<section class="hero">
+				<div>
+					<span class="eyebrow">Export / report</span>
+					<h1>Reports need your source data.</h1>
+					<p class="lede">Sign in to generate reports from routed training, nutrition, recovery, and source-health context.</p>
+				</div>
+				<div class="panel">
+					<strong>Sign in required</strong>
+					<p>Reports are intentionally blank until real connected data is available.</p>
+					<a class="button primary" href="/signin">Sign in</a>
+				</div>
+			</section>
+		</main>`;
+		return c.html(settingsShell("Reports", body));
+	}
+	const timezone = normalizeTimezone(c.req.query("timezone") || "America/New_York");
+	const date = localDateForTimezone(timezone);
+	const [context, scorePreferences] = await Promise.all([
+		collectHealthContext(c.env, session, {
+			categories: ["nutrition", "hrv", "sleep", "fitness_activities", "gym_workouts", "steps", "recovery"],
+			timezone,
+			date,
+			rangeDays: 30,
+		}),
+		getScorePreferences(c.env, session),
+	]);
+	const scores = scoreSummary(context, scorePreferences);
+	const readyCategories = context.categories.filter((category) => category.status === "ready");
+	const macro = nutritionMacroLine(context);
+	const activityCount =
+		arrayFrom(contextFor(context, "fitness_activities")?.data).length +
+		arrayFrom(contextFor(context, "gym_workouts")?.data).length;
+	const reportMarkdown = `# ZorFit Monthly Report
+
+User: @${session.login}
+Date: ${date}
+Ready categories: ${readyCategories.length}/${context.categories.length}
+Overall score: ${scores.overall.score} (${scoreBand(scores.overall.score)})
+Nutrition score: ${scores.nutrition.score}
+Readiness score: ${scores.readiness.score}
+Fitness score: ${scores.fitness.score}
+Latest nutrition: ${macro ?? "No routed nutrition data returned"}
+Activity records in window: ${activityCount}
+Coach verdict: ${motivationalMessage(scores)}
+
+Source notes:
+${context.categories.map((category) => `- ${categoryLabel(category.category)} via ${PROVIDER_LABELS[category.provider]}: ${category.status}${category.note ? ` - ${category.note}` : ""}`).join("\n")}`;
+	const body = `<main class="shell">
+		<section class="hero">
+			<div>
+				<span class="eyebrow">Export / report</span>
+				<h1>Monthly memory layer.</h1>
+				<p class="lede">For @${escapeHtml(session.login)}. Training volume, nutrition averages, source status, and coach notes in export-ready PDF or markdown form.</p>
+			</div>
+			<div class="panel">
+				${renderFreshnessPanel("Generated from current request")}
+				<div class="actions">
+					<a class="button primary" href="/my-week">Open weekly review</a>
+					<a class="button" href="/connections">Source health</a>
+				</div>
+			</div>
+		</section>
+		<section class="section">
+			<div class="feature-grid">
+				<article class="panel feature-card">
+					<span class="status">PDF ready</span>
+					<h3>June performance review</h3>
+					<p>${readyCategories.length} routed data categories are available for report generation.</p>
+				</article>
+				<article class="panel feature-card">
+					<span class="status">Markdown</span>
+					<h3>Coach summary</h3>
+					<p>Copy-ready plain-text review built from current score, nutrition, activity count, and source notes.</p>
+				</article>
+				<article class="panel feature-card">
+					<span class="status">Share card</span>
+					<h3>Weekly accountability card</h3>
+					<p>Compact card should use the same real weekly score inputs as /my-week.</p>
+				</article>
+			</div>
+		</section>
+		<section class="section">
+			<div class="section-head">
+				<div>
+					<span class="eyebrow">Preview</span>
+					<h2>Markdown report.</h2>
+				</div>
+			</div>
+			<pre class="report-preview">${escapeHtml(reportMarkdown)}</pre>
+		</section>
+	</main>`;
+	return c.html(settingsShell("Reports", body));
 });
 
 utilityRoutes.get("/api/data-preferences", async (c) => {
