@@ -185,6 +185,10 @@ utilityRoutes.get("/signup", (c) => {
 	return c.html(html);
 });
 
+utilityRoutes.get("/signin", (c) => {
+	return c.redirect("/signup");
+});
+
 type SettingsCard = {
 	id: string;
 	label: string;
