@@ -35,6 +35,15 @@ import { sendLongTelegramMessage } from "./telegram.js";
 
 const TELEGRAM_SAFETY_FOOTER =
 	"Not medical advice. Consult a qualified professional for health or nutrition decisions.";
+
+function compactInsightSummary(value: string): string {
+	return value
+		.replace(/<[^>]+>/g, "")
+		.replace(/[*_`#>|-]/g, " ")
+		.replace(/\s+/g, " ")
+		.trim()
+		.slice(0, 260);
+}
 type InsightSession = Pick<Props, "login" | "name" | "email">;
 
 function sessionForDueSchedule(
@@ -150,9 +159,10 @@ async function processDueSchedule(
 		schedule.insightMode === "previous_day" || date < schedule.localDate
 			? "ZorFit previous day nutrition"
 			: "ZorFit nutrition check-in";
+	const text = `${title}\n\n${insight}\n\n${TELEGRAM_SAFETY_FOOTER}`;
 	await sendLongTelegramMessage(env, {
 		chatId: telegram.externalUserId,
-		text: `${title}\n\n${insight}\n\n${TELEGRAM_SAFETY_FOOTER}`,
+		text,
 	});
 	await markNotificationSlotSent(env, schedule.userId, schedule.slotKey);
 	await logNotification(env, {
@@ -161,6 +171,9 @@ async function processDueSchedule(
 		topic: "nutrition",
 		scheduledFor: schedule.slotKey,
 		status: "sent",
+		messageTitle: title,
+		messageSummary: compactInsightSummary(insight),
+		messageText: text,
 	});
 }
 
@@ -206,9 +219,10 @@ async function processDueUserMessageSchedule(
 	const insight = aiConnection
 		? await generateHealthInsight(aiConnection, input)
 		: generateBasicHealthInsight(input);
+	const text = `${schedule.title}\n\n${insight}\n\n${TELEGRAM_SAFETY_FOOTER}`;
 	await sendLongTelegramMessage(env, {
 		chatId: telegram.externalUserId,
-		text: `${schedule.title}\n\n${insight}\n\n${TELEGRAM_SAFETY_FOOTER}`,
+		text,
 	});
 	await markUserMessageSlotSent(env, schedule.id, schedule.slotKey);
 	await logNotification(env, {
@@ -217,6 +231,10 @@ async function processDueUserMessageSchedule(
 		topic: "nutrition",
 		scheduledFor: schedule.slotKey,
 		status: "sent",
+		scheduleId: schedule.id,
+		messageTitle: schedule.title,
+		messageSummary: compactInsightSummary(insight),
+		messageText: text,
 	});
 }
 

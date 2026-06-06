@@ -68,6 +68,19 @@ export interface DueUserMessageSchedule extends UserMessageSchedule {
 	slotKey: string;
 }
 
+export interface NotificationLogEntry {
+	id: string;
+	scheduleId?: string;
+	messageTitle?: string;
+	messageSummary?: string;
+	messageText?: string;
+	scheduledFor: string;
+	sentAt?: string;
+	status: "sent" | "skipped" | "failed";
+	errorMessage?: string;
+	createdAt: string;
+}
+
 function idFor(userId: string, channel: string, topic?: string): string {
 	return topic ? `${userId}:${channel}:${topic}` : `${userId}:${channel}`;
 }
@@ -424,12 +437,16 @@ export async function logNotification(
 		scheduledFor: string;
 		status: "sent" | "skipped" | "failed";
 		errorMessage?: string;
+		scheduleId?: string;
+		messageTitle?: string;
+		messageSummary?: string;
+		messageText?: string;
 	},
 ): Promise<void> {
 	await env.ZORFIT_DB.prepare(
 		`INSERT INTO user_notification_logs
-		   (id, user_id, channel, topic, scheduled_for, sent_at, status, error_message)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		   (id, user_id, channel, topic, scheduled_for, sent_at, status, error_message, schedule_id, message_title, message_summary, message_text)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 	)
 		.bind(
 			crypto.randomUUID(),
@@ -440,8 +457,52 @@ export async function logNotification(
 			args.status === "sent" ? new Date().toISOString() : null,
 			args.status,
 			args.errorMessage ?? null,
+			args.scheduleId ?? null,
+			args.messageTitle ?? null,
+			args.messageSummary ?? null,
+			args.messageText ?? null,
 		)
 		.run();
+}
+
+export async function listNotificationLogs(
+	env: NotificationEnv,
+	session: Pick<Props, "login" | "name" | "email">,
+	args: { sinceIso?: string; limit?: number } = {},
+): Promise<NotificationLogEntry[]> {
+	const userId = await ensureUser(env, session);
+	const { results } = await env.ZORFIT_DB.prepare(
+		`SELECT id, schedule_id, message_title, message_summary, message_text, scheduled_for, sent_at, status, error_message, created_at
+		 FROM user_notification_logs
+		 WHERE user_id = ? AND created_at >= ?
+		 ORDER BY created_at DESC
+		 LIMIT ?`,
+	)
+		.bind(userId, args.sinceIso ?? "1970-01-01T00:00:00.000Z", args.limit ?? 100)
+		.all<{
+			id: string;
+			schedule_id: string | null;
+			message_title: string | null;
+			message_summary: string | null;
+			message_text: string | null;
+			scheduled_for: string;
+			sent_at: string | null;
+			status: "sent" | "skipped" | "failed";
+			error_message: string | null;
+			created_at: string;
+		}>();
+	return (results ?? []).map((row) => ({
+		id: row.id,
+		scheduleId: row.schedule_id ?? undefined,
+		messageTitle: row.message_title ?? undefined,
+		messageSummary: row.message_summary ?? undefined,
+		messageText: row.message_text ?? undefined,
+		scheduledFor: row.scheduled_for,
+		sentAt: row.sent_at ?? undefined,
+		status: row.status,
+		errorMessage: row.error_message ?? undefined,
+		createdAt: row.created_at,
+	}));
 }
 
 function parseJsonArray(value: string | null | undefined): unknown[] {

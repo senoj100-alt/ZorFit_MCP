@@ -19,6 +19,7 @@ import {
 	deleteUserMessageSchedule,
 	getNotificationSchedule,
 	getTelegramConnection,
+	listNotificationLogs,
 	listUserMessageSchedules,
 	normalizeInsightMode,
 	normalizeMessageQuestion,
@@ -29,6 +30,7 @@ import {
 	upsertNotificationSchedule,
 	upsertTelegramConnection,
 	type UserMessageSchedule,
+	type NotificationLogEntry,
 } from "../lib/notifications.js";
 import {
 	HEALTH_CATEGORIES,
@@ -44,6 +46,7 @@ import {
 } from "../lib/data-routing.js";
 import { sendTestNutritionInsight } from "../lib/scheduled-nutrition.js";
 import { getZorFitServiceStatuses } from "../lib/service-registry.js";
+import { ensureUser } from "../lib/service-connections.js";
 import {
 	sendLongTelegramMessage,
 	sendTelegramMessage,
@@ -825,6 +828,40 @@ function settingsShell(title: string, body: string): string {
 			letter-spacing: 0.08em;
 			text-transform: uppercase;
 		}
+		.controls-grid, .kpi-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+			gap: 14px;
+		}
+		.controls-grid .check-card { min-height: 58px; }
+		.kpi-card {
+			padding: 16px;
+			min-height: 160px;
+		}
+		.kpi-card strong {
+			color: var(--muted);
+			font-size: 0.76rem;
+			font-weight: 840;
+			letter-spacing: 0.1em;
+			text-transform: uppercase;
+		}
+		.kpi-value {
+			margin-top: 12px;
+			color: var(--text);
+			font-size: 2.35rem;
+			font-weight: 920;
+			line-height: 0.95;
+		}
+		.kpi-card p { margin: 10px 0 0; font-size: 0.88rem; }
+		.kpi-trend {
+			display: inline-flex;
+			margin-top: 12px;
+			color: var(--green);
+			font-size: 0.78rem;
+			font-weight: 820;
+			letter-spacing: 0.08em;
+			text-transform: uppercase;
+		}
 		#message { min-height: 24px; margin-top: 14px; color: var(--green); font-weight: 760; }
 		footer {
 			padding: 36px 0;
@@ -1139,6 +1176,111 @@ function trendPhrase(delta: number | undefined, unit = "%"): string {
 	return `${rounded > 0 ? "+" : ""}${rounded}${unit} vs baseline`;
 }
 
+function trendLabel(delta: number | undefined, lowerIsBetter = false): string {
+	if (delta === undefined || Math.abs(delta) < 3) return "staying flat";
+	const improving = lowerIsBetter ? delta < 0 : delta > 0;
+	return improving ? "trending better" : "trending down";
+}
+
+function formatMetric(value: number | undefined, suffix = ""): string {
+	if (value === undefined || Number.isNaN(value)) return "No data";
+	return `${Math.round(value * 10) / 10}${suffix}`;
+}
+
+function coefficientOfVariation(values: number[]): number | undefined {
+	const mean = average(values);
+	if (mean === undefined || mean === 0) return undefined;
+	const variance =
+		values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length;
+	return (Math.sqrt(variance) / mean) * 100;
+}
+
+interface ScorePreferences {
+	nutritionWeight: number;
+	readinessWeight: number;
+	fitnessWeight: number;
+	proteinTargetG: number;
+	sugarLimitG: number;
+	fiberTargetG: number;
+	sleepTargetHours: number;
+}
+
+const DEFAULT_SCORE_PREFERENCES: ScorePreferences = {
+	nutritionWeight: 35,
+	readinessWeight: 35,
+	fitnessWeight: 30,
+	proteinTargetG: 100,
+	sugarLimitG: 25,
+	fiberTargetG: 25,
+	sleepTargetHours: 7,
+};
+
+async function getScorePreferences(
+	env: Env,
+	session: Pick<Props, "login" | "name" | "email">,
+): Promise<ScorePreferences> {
+	const userId = await ensureUser(env, session);
+	const row = await env.ZORFIT_DB.prepare(
+		`SELECT nutrition_weight, readiness_weight, fitness_weight, protein_target_g, sugar_limit_g, fiber_target_g, sleep_target_hours
+		 FROM user_score_preferences
+		 WHERE user_id = ?`,
+	)
+		.bind(userId)
+		.first<{
+			nutrition_weight: number;
+			readiness_weight: number;
+			fitness_weight: number;
+			protein_target_g: number;
+			sugar_limit_g: number;
+			fiber_target_g: number;
+			sleep_target_hours: number;
+		}>();
+	if (!row) return DEFAULT_SCORE_PREFERENCES;
+	return {
+		nutritionWeight: row.nutrition_weight,
+		readinessWeight: row.readiness_weight,
+		fitnessWeight: row.fitness_weight,
+		proteinTargetG: row.protein_target_g,
+		sugarLimitG: row.sugar_limit_g,
+		fiberTargetG: row.fiber_target_g,
+		sleepTargetHours: row.sleep_target_hours,
+	};
+}
+
+async function upsertScorePreferences(
+	env: Env,
+	session: Pick<Props, "login" | "name" | "email">,
+	preferences: ScorePreferences,
+): Promise<void> {
+	const userId = await ensureUser(env, session);
+	await env.ZORFIT_DB.prepare(
+		`INSERT INTO user_score_preferences
+		   (user_id, nutrition_weight, readiness_weight, fitness_weight, protein_target_g, sugar_limit_g, fiber_target_g, sleep_target_hours, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		 ON CONFLICT(user_id) DO UPDATE SET
+		   nutrition_weight = excluded.nutrition_weight,
+		   readiness_weight = excluded.readiness_weight,
+		   fitness_weight = excluded.fitness_weight,
+		   protein_target_g = excluded.protein_target_g,
+		   sugar_limit_g = excluded.sugar_limit_g,
+		   fiber_target_g = excluded.fiber_target_g,
+		   sleep_target_hours = excluded.sleep_target_hours,
+		   updated_at = excluded.updated_at`,
+	)
+		.bind(
+			userId,
+			preferences.nutritionWeight,
+			preferences.readinessWeight,
+			preferences.fitnessWeight,
+			preferences.proteinTargetG,
+			preferences.sugarLimitG,
+			preferences.fiberTargetG,
+			preferences.sleepTargetHours,
+			new Date().toISOString(),
+		)
+		.run();
+}
+
 interface MacroDay {
 	date?: string;
 	calories?: number;
@@ -1200,7 +1342,10 @@ interface ScoreSummary {
 	fitness: ScoreBreakdown;
 }
 
-function nutritionScore(context: HealthContextBundle): ScoreBreakdown {
+function nutritionScore(
+	context: HealthContextBundle,
+	preferences: ScorePreferences,
+): ScoreBreakdown {
 	const nutrition = contextFor(context, "nutrition");
 	if (nutrition?.status !== "ready") {
 		return {
@@ -1230,33 +1375,39 @@ function nutritionScore(context: HealthContextBundle): ScoreBreakdown {
 	];
 	score += Math.min(10, Math.max(-12, (days.length - 4) * 3));
 	if (today.protein !== undefined) {
-		if (today.protein >= 100 || (baselineProtein && today.protein >= baselineProtein * 0.9)) {
+		if (
+			today.protein >= preferences.proteinTargetG ||
+			(baselineProtein && today.protein >= baselineProtein * 0.9)
+		) {
 			score += 9;
 			details.push(`Protein is ${Math.round(today.protein)}g, ${trendPhrase(proteinDelta)}.`);
 		} else {
 			score -= 9;
-			details.push(`Protein is ${Math.round(today.protein)}g, below recent baseline.`);
+			details.push(`Protein is ${Math.round(today.protein)}g, below the ${preferences.proteinTargetG}g target/recent baseline.`);
 		}
 	} else {
 		score -= 8;
 		details.push("Protein total is missing.");
 	}
 	if (today.sugar !== undefined) {
-		if (today.sugar <= 25 || (baselineSugar && today.sugar <= baselineSugar * 1.05)) {
+		if (
+			today.sugar <= preferences.sugarLimitG ||
+			(baselineSugar && today.sugar <= baselineSugar * 1.05)
+		) {
 			score += 7;
 			details.push(`Sugar is ${Math.round(today.sugar)}g, controlled against the 7-day baseline.`);
 		} else {
 			score -= today.sugar > 50 ? 12 : 7;
-			details.push(`Sugar is ${Math.round(today.sugar)}g, ${trendPhrase(sugarDelta)}.`);
+			details.push(`Sugar is ${Math.round(today.sugar)}g, above the ${preferences.sugarLimitG}g limit and ${trendPhrase(sugarDelta)}.`);
 		}
 	}
 	if (today.fiber !== undefined) {
-		if (today.fiber >= 25) {
+		if (today.fiber >= preferences.fiberTargetG) {
 			score += 5;
 			details.push(`Fiber is ${Math.round(today.fiber)}g, in a strong range.`);
 		} else {
 			score -= 4;
-			details.push(`Fiber is ${Math.round(today.fiber)}g; higher fiber would improve the score.`);
+			details.push(`Fiber is ${Math.round(today.fiber)}g; target is ${preferences.fiberTargetG}g.`);
 		}
 	}
 	if (today.calories !== undefined && baselineCalories) {
@@ -1278,7 +1429,10 @@ function metricSeries(
 		.filter((value): value is number => value !== undefined);
 }
 
-function readinessScore(context: HealthContextBundle): ScoreBreakdown {
+function readinessScore(
+	context: HealthContextBundle,
+	preferences: ScorePreferences,
+): ScoreBreakdown {
 	const hrv = [
 		...metricSeries(context, "hrv", /^(hrv|hrv_rmssd|rmssd|hrv_sdnn)$/i),
 		...metricSeries(context, "recovery", /^(hrv|hrv_rmssd|rmssd|hrv_sdnn)$/i),
@@ -1318,11 +1472,11 @@ function readinessScore(context: HealthContextBundle): ScoreBreakdown {
 		details.push("HRV trend is incomplete.");
 	}
 	if (latestSleepHours !== undefined) {
-		if (latestSleepHours >= 7) score += 11;
-		else if (latestSleepHours >= 6) score += 2;
+		if (latestSleepHours >= preferences.sleepTargetHours) score += 11;
+		else if (latestSleepHours >= preferences.sleepTargetHours - 1) score += 2;
 		else score -= 12;
 		const sleepDelta = percentDelta(latestSleepHours, sleepBaselineHours);
-		details.push(`Sleep latest ${latestSleepHours.toFixed(1)}h, ${trendPhrase(sleepDelta)}.`);
+		details.push(`Sleep latest ${latestSleepHours.toFixed(1)}h vs ${preferences.sleepTargetHours}h target, ${trendPhrase(sleepDelta)}.`);
 	} else {
 		score -= 5;
 		details.push("Sleep duration trend is incomplete.");
@@ -1378,12 +1532,24 @@ function fitnessScore(context: HealthContextBundle): ScoreBreakdown {
 	return { score: boundedScore(score), details };
 }
 
-function scoreSummary(context: HealthContextBundle): ScoreSummary {
-	const nutrition = nutritionScore(context);
-	const readiness = readinessScore(context);
+function scoreSummary(
+	context: HealthContextBundle,
+	preferences: ScorePreferences,
+): ScoreSummary {
+	const nutrition = nutritionScore(context, preferences);
+	const readiness = readinessScore(context, preferences);
 	const fitness = fitnessScore(context);
+	const totalWeight =
+		preferences.nutritionWeight +
+		preferences.readinessWeight +
+		preferences.fitnessWeight;
 	const overallValue =
-		nutrition.score * 0.35 + readiness.score * 0.35 + fitness.score * 0.3;
+		totalWeight > 0
+			? (nutrition.score * preferences.nutritionWeight +
+					readiness.score * preferences.readinessWeight +
+					fitness.score * preferences.fitnessWeight) /
+				totalWeight
+			: (nutrition.score + readiness.score + fitness.score) / 3;
 	return {
 		nutrition,
 		readiness,
@@ -1391,11 +1557,119 @@ function scoreSummary(context: HealthContextBundle): ScoreSummary {
 		overall: {
 			score: boundedScore(overallValue),
 			details: [
-				`Weighted score = nutrition 35% (${nutrition.score}), readiness 35% (${readiness.score}), fitness 30% (${fitness.score}).`,
+				`Weighted score = nutrition ${preferences.nutritionWeight}% (${nutrition.score}), readiness ${preferences.readinessWeight}% (${readiness.score}), fitness ${preferences.fitnessWeight}% (${fitness.score}).`,
 				"Each component uses the recent routed data window where available.",
 			],
 		},
 	};
+}
+
+interface KpiCard {
+	label: string;
+	value: string;
+	bottomLine: string;
+	trend: string;
+}
+
+function renderKpiCard(card: KpiCard): string {
+	return `<article class="panel kpi-card">
+		<strong>${escapeHtml(card.label)}</strong>
+		<div class="kpi-value">${escapeHtml(card.value)}</div>
+		<p>${escapeHtml(card.bottomLine)}</p>
+		<span class="kpi-trend">${escapeHtml(card.trend)}</span>
+	</article>`;
+}
+
+function myDayKpis(context: HealthContextBundle): KpiCard[] {
+	const rhr = [
+		...metricSeries(context, "hrv", /resting.*hr|resting.*heart|resting_heartrate|restingHR/i),
+		...metricSeries(context, "recovery", /resting.*hr|resting.*heart|resting_heartrate|restingHR/i),
+	];
+	const hrv = [
+		...metricSeries(context, "hrv", /^(hrv|hrv_rmssd|rmssd|hrv_sdnn)$/i),
+		...metricSeries(context, "recovery", /^(hrv|hrv_rmssd|rmssd|hrv_sdnn)$/i),
+	];
+	const sleepSeconds = [
+		...metricSeries(context, "sleep", /sleep.*(sec|duration|total)|total_sleep|sleep_secs/i),
+		...metricSeries(context, "recovery", /sleep.*(sec|duration|total)|total_sleep|sleep_secs/i),
+	];
+	const sleepHours = sleepSeconds.map((value) => value / 3600);
+	const rhrDelta = percentDelta(rhr[rhr.length - 1], average(rhr.slice(0, -1)));
+	const hrvDelta = percentDelta(hrv[hrv.length - 1], average(hrv.slice(0, -1)));
+	const sleepDelta = percentDelta(
+		sleepHours[sleepHours.length - 1],
+		average(sleepHours.slice(0, -1)),
+	);
+	return [
+		{
+			label: "Resting heart rate",
+			value: formatMetric(rhr[rhr.length - 1], " bpm"),
+			bottomLine: `7-day avg ${formatMetric(average(rhr), " bpm")}`,
+			trend: trendLabel(rhrDelta, true),
+		},
+		{
+			label: "HRV",
+			value: formatMetric(hrv[hrv.length - 1], " ms"),
+			bottomLine: `7-day avg ${formatMetric(average(hrv), " ms")} · CV ${formatMetric(coefficientOfVariation(hrv), "%")}`,
+			trend: trendLabel(hrvDelta),
+		},
+		{
+			label: "Sleep time",
+			value: formatMetric(sleepHours[sleepHours.length - 1], "h"),
+			bottomLine: `7-day avg ${formatMetric(average(sleepHours), "h")}`,
+			trend: trendLabel(sleepDelta),
+		},
+	];
+}
+
+function cronometerScoreValue(value: unknown, pattern: RegExp): number | undefined {
+	if (!value || typeof value !== "object") return undefined;
+	if (Array.isArray(value)) {
+		for (const item of value) {
+			const found = cronometerScoreValue(item, pattern);
+			if (found !== undefined) return found;
+		}
+		return undefined;
+	}
+	for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+		if (pattern.test(key)) {
+			const direct = numberFrom(child);
+			if (direct !== undefined) return direct;
+			const nested = valueByKeyPattern(child, /score|percent|value|amount/i);
+			if (nested !== undefined) return nested;
+		}
+		const found = cronometerScoreValue(child, pattern);
+		if (found !== undefined) return found;
+	}
+	return undefined;
+}
+
+function cronometerScoreCards(context: HealthContextBundle): KpiCard[] {
+	const nutritionDaysList = nutritionDays(context);
+	const latest = nutritionDaysList[nutritionDaysList.length - 1];
+	const nutrition = contextFor(context, "nutrition");
+	const data = safeRecord(nutrition?.data);
+	const today = safeRecord(data?.today) ?? safeRecord(nutrition?.data);
+	const scoreSource = safeRecord(today?.nutritionScores) ?? safeRecord(data?.nutritionScores);
+	const definitions: Array<[string, RegExp]> = [
+		["Overall", /overall|complete|score/i],
+		["Minerals", /mineral/i],
+		["Vitamins", /vitamin/i],
+		["Antioxidants", /antioxidant/i],
+		["Electrolytes", /electrolyte|sodium|potassium/i],
+	];
+	return definitions
+		.map(([label, pattern]) => {
+			const score = cronometerScoreValue(scoreSource, pattern);
+			if (score === undefined) return null;
+			return {
+				label: `Cronometer ${label}`,
+				value: formatMetric(score, score <= 1 ? "" : "%"),
+				bottomLine: latest?.date ? `Latest nutrition score for ${latest.date}` : "Latest nutrition score",
+				trend: "from Cronometer",
+			} satisfies KpiCard;
+		})
+		.filter(Boolean) as KpiCard[];
 }
 
 function motivationalMessage(scores: ScoreSummary): string {
@@ -1412,26 +1686,42 @@ interface MyDayTimelineItem {
 	time: string;
 	title: string;
 	summary: string;
-	status: "sent" | "pending" | "empty";
+	status: "sent" | "pending" | "empty" | "event";
 }
 
-function timelineSummaryFor(schedule: UserMessageSchedule, sent: boolean): string {
+interface TimelineOptions {
+	includeSentMessages: boolean;
+	includeYesterdaySummary: boolean;
+	includeEventTimeline: boolean;
+}
+
+function timelineSummaryFor(
+	schedule: UserMessageSchedule,
+	sent: boolean,
+	log?: NotificationLogEntry,
+): string {
+	if (log?.messageSummary) return log.messageSummary;
 	const categories = schedule.categories.length
 		? schedule.categories.map(categoryLabel).join(", ")
 		: "selected health data";
-	const question = schedule.question
-		? ` Question: ${schedule.question}`
-		: "";
-	return `${sent ? "Sent" : "Scheduled"} using ${categories}.${question}`;
+	if (sent) {
+		return `Sent using ${categories}. Summary capture starts with newly delivered ZorFit messages.`;
+	}
+	return `Scheduled using ${categories}.`;
 }
 
 function buildMyDayTimeline(
 	schedules: UserMessageSchedule[],
+	logs: NotificationLogEntry[],
+	context: HealthContextBundle,
 	date: string,
 	currentTime: string,
+	options: TimelineOptions,
 ): MyDayTimelineItem[] {
 	const currentMinutes = minutesFromTime(currentTime);
-	const items = schedules
+	const logMap = new Map(logs.map((log) => [log.scheduledFor, log]));
+	const items: MyDayTimelineItem[] = options.includeSentMessages
+		? schedules
 		.filter((schedule) => schedule.enabled)
 		.flatMap((schedule) =>
 			schedule.times
@@ -1439,16 +1729,82 @@ function buildMyDayTimeline(
 				.map((time) => {
 					const slotKey = `${schedule.id}:${date}:${time}`;
 					const sent = Boolean(schedule.lastSent[slotKey]);
+					const log = logMap.get(slotKey);
 					return {
 						time,
-						title: schedule.title || "ZorFit insight",
-						summary: timelineSummaryFor(schedule, sent),
+						title: log?.messageTitle || schedule.title || "ZorFit insight",
+						summary: timelineSummaryFor(schedule, sent, log),
 						status: sent ? "sent" : "pending",
 					} satisfies MyDayTimelineItem;
 				}),
 		)
-		.sort((a, b) => minutesFromTime(a.time) - minutesFromTime(b.time));
-	if (items.length) return items;
+		: [];
+	if (options.includeYesterdaySummary) {
+		const days = nutritionDays(context);
+		const yesterday = days.length > 1 ? days[days.length - 2] : undefined;
+		items.push({
+			time: "06:00",
+			title: "Yesterday summary",
+			summary: yesterday
+				? [
+						yesterday.calories !== undefined ? `${Math.round(yesterday.calories)} kcal` : "",
+						yesterday.protein !== undefined ? `${Math.round(yesterday.protein)}g protein` : "",
+						yesterday.sugar !== undefined ? `${Math.round(yesterday.sugar)}g sugar` : "",
+					]
+						.filter(Boolean)
+						.join(" · ") || "Previous nutrition day found, but macro totals were incomplete."
+				: "Previous-day summary needs at least two logged Cronometer days.",
+			status: "event",
+		});
+	}
+	if (options.includeEventTimeline) {
+		const macro = nutritionMacroLine(context);
+		items.push(
+			{
+				time: "06:30",
+				title: "Wake up",
+				summary: "Morning readiness check: review sleep, HRV, and resting heart rate before choosing training intensity.",
+				status: "event",
+			},
+			{
+				time: "09:00",
+				title: "Breakfast summary",
+				summary: macro
+					? `Nutrition logged today: ${macro}.`
+					: "Breakfast/mealtime details appear once Cronometer entries are available.",
+				status: "event",
+			},
+			{
+				time: "13:00",
+				title: "Lunch summary",
+				summary: "Use this checkpoint to review protein, fiber, sugar, and calories before the afternoon.",
+				status: "event",
+			},
+			{
+				time: "17:00",
+				title: "Snacks summary",
+				summary: "Afternoon snack checkpoint: keep sugar controlled and close protein or micronutrient gaps.",
+				status: "event",
+			},
+			{
+				time: "19:00",
+				title: "Workout summary",
+				summary: "Training checkpoint: activity and gym summaries will appear here as sources provide events.",
+				status: "event",
+			},
+			{
+				time: "20:30",
+				title: "Dinner summary",
+				summary: "Dinner checkpoint: finish protein, fiber, hydration, and recovery basics for the day.",
+				status: "event",
+			},
+		);
+	}
+	items.sort((a, b) => minutesFromTime(a.time) - minutesFromTime(b.time));
+	const visibleItems = items.filter(
+		(item) => item.status !== "event" || minutesFromTime(item.time) <= currentMinutes,
+	);
+	if (visibleItems.length) return visibleItems;
 	return [
 		{
 			time: currentTime,
@@ -1479,7 +1835,9 @@ function renderTimelineItem(item: MyDayTimelineItem): string {
 			? "sent"
 			: item.status === "pending"
 				? "pending"
-				: "setup";
+				: item.status === "event"
+					? "event"
+					: "setup";
 	return `<article class="timeline-item">
 		<span class="timeline-dot ${item.status}"></span>
 		<div class="timeline-time">${escapeHtml(item.time)}<span class="timeline-badge">${badge}</span></div>
@@ -1563,6 +1921,14 @@ utilityRoutes.get("/settings", (c) => {
 				"Connect Telegram and future messaging channels for scheduled insight delivery.",
 			href: "/settings/messages",
 		},
+		{
+			id: "scoring",
+			label: "Score Formula",
+			status: "Configurable",
+			description:
+				"Set score weights and personal nutrition, sleep, and recovery targets used on My Day.",
+			href: "/settings/scoring",
+		},
 	];
 	const body = `<main class="shell">
 		<section class="hero">
@@ -1582,6 +1948,81 @@ utilityRoutes.get("/settings", (c) => {
 		</section>
 	</main>`;
 	return c.html(settingsShell("Settings", body));
+});
+
+utilityRoutes.get("/settings/scoring", async (c) => {
+	const session = await getSettingsSession(c);
+	const preferences = session
+		? await getScorePreferences(c.env, session)
+		: DEFAULT_SCORE_PREFERENCES;
+	const body = `<main class="shell">
+		<section class="hero">
+			<div>
+				<span class="eyebrow">Score formula</span>
+				<h1>Configure how My Day is scored.</h1>
+				<p class="lede">Tune the weights and targets ZorFit uses for overall score, nutrition score, readiness score, and the tooltip explanations.</p>
+			</div>
+			<div class="panel">
+				<strong>${session ? `Signed in as @${escapeHtml(session.login)}` : "Sign in required"}</strong>
+				<p>${session ? "Changes apply to the My Day dashboard immediately after saving." : "Sign in before saving scoring preferences."}</p>
+			</div>
+		</section>
+		<section class="section">
+			<div class="actions"><a class="button" href="/settings">Back to settings</a><a class="button" href="/my-day">Open My Day</a></div>
+			<form class="panel" id="scoreForm">
+				<div class="row">
+					<div>
+						<label>Nutrition weight</label>
+						<input name="nutritionWeight" type="number" min="0" max="100" value="${preferences.nutritionWeight}">
+					</div>
+					<div>
+						<label>Readiness weight</label>
+						<input name="readinessWeight" type="number" min="0" max="100" value="${preferences.readinessWeight}">
+					</div>
+				</div>
+				<div class="row">
+					<div>
+						<label>Fitness weight</label>
+						<input name="fitnessWeight" type="number" min="0" max="100" value="${preferences.fitnessWeight}">
+					</div>
+					<div>
+						<label>Sleep target hours</label>
+						<input name="sleepTargetHours" type="number" min="3" max="12" step="0.25" value="${preferences.sleepTargetHours}">
+					</div>
+				</div>
+				<div class="row">
+					<div>
+						<label>Protein target, grams</label>
+						<input name="proteinTargetG" type="number" min="0" max="400" value="${preferences.proteinTargetG}">
+					</div>
+					<div>
+						<label>Sugar limit, grams</label>
+						<input name="sugarLimitG" type="number" min="0" max="300" value="${preferences.sugarLimitG}">
+					</div>
+				</div>
+				<label>Fiber target, grams</label>
+				<input name="fiberTargetG" type="number" min="0" max="120" value="${preferences.fiberTargetG}">
+				<div class="helper">Overall score uses your three weights proportionally. Nutrition uses protein, sugar, fiber, logging consistency, and calorie stability. Readiness uses HRV, sleep, and resting heart rate trends.</div>
+				<div class="actions"><button class="primary" type="submit" ${session ? "" : "disabled"}>Save score formula</button></div>
+				<div id="message"></div>
+			</form>
+		</section>
+	</main>
+	<script>
+		document.getElementById("scoreForm")?.addEventListener("submit", async (event) => {
+			event.preventDefault();
+			const form = event.currentTarget;
+			const payload = Object.fromEntries(new FormData(form).entries());
+			const response = await fetch("/api/score-preferences", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(payload),
+			});
+			const data = await response.json().catch(() => ({}));
+			document.getElementById("message").textContent = response.ok ? "Saved score formula." : (data.error || "Could not save score formula.");
+		});
+	</script>`;
+	return c.html(settingsShell("Score Formula", body));
 });
 
 utilityRoutes.get("/settings/sources", async (c) => {
@@ -2558,10 +2999,29 @@ utilityRoutes.get("/my-day", async (c) => {
 	}
 
 	const schedules = await listUserMessageSchedules(c.env, session);
+	const logsSince = new Date();
+	logsSince.setUTCDate(logsSince.getUTCDate() - 3);
+	const [logs, scorePreferences] = await Promise.all([
+		listNotificationLogs(c.env, session, {
+			sinceIso: logsSince.toISOString(),
+			limit: 100,
+		}),
+		getScorePreferences(c.env, session),
+	]);
 	const timezone = normalizeTimezone(
 		c.req.query("timezone") || schedules[0]?.timezone || "America/New_York",
 	);
 	const local = localDateTimeForTimezone(timezone);
+	const timelineConfigured = c.req.query("timeline") === "1";
+	const timelineOptions: TimelineOptions = {
+		includeSentMessages: timelineConfigured ? c.req.query("sent") === "1" : true,
+		includeYesterdaySummary: timelineConfigured
+			? c.req.query("yesterday") === "1"
+			: true,
+		includeEventTimeline: timelineConfigured
+			? c.req.query("events") === "1"
+			: true,
+	};
 	const categories = configuredCategories(schedules);
 	const context = await collectHealthContext(c.env, session, {
 		categories,
@@ -2569,9 +3029,18 @@ utilityRoutes.get("/my-day", async (c) => {
 		date: local.date,
 		rangeDays: 7,
 	});
-	const scores = scoreSummary(context);
-	const timeline = buildMyDayTimeline(schedules, local.date, local.time);
+	const scores = scoreSummary(context, scorePreferences);
+	const timeline = buildMyDayTimeline(
+		schedules,
+		logs,
+		context,
+		local.date,
+		local.time,
+		timelineOptions,
+	);
 	const macroLine = nutritionMacroLine(context);
+	const kpis = myDayKpis(context);
+	const cronometerScores = cronometerScoreCards(context);
 	const readySources = context.categories.filter(
 		(category) => category.status === "ready",
 	).length;
@@ -2588,6 +3057,7 @@ utilityRoutes.get("/my-day", async (c) => {
 				<div class="actions">
 					<a class="button" href="/settings/messages">Edit messages</a>
 					<a class="button" href="/settings/data-routing">Data routing</a>
+					<a class="button" href="/settings/scoring">Score formula</a>
 				</div>
 			</div>
 		</section>
@@ -2613,11 +3083,53 @@ utilityRoutes.get("/my-day", async (c) => {
 		<section class="section">
 			<div class="section-head">
 				<div>
+					<span class="eyebrow">Vitals</span>
+					<h2>Today at a glance.</h2>
+				</div>
+				<p>Key recovery metrics compared with the recent seven-day window.</p>
+			</div>
+			<div class="kpi-grid">${kpis.map(renderKpiCard).join("")}</div>
+		</section>
+		${
+			cronometerScores.length
+				? `<section class="section">
+					<div class="section-head">
+						<div>
+							<span class="eyebrow">Cronometer</span>
+							<h2>Nutrition quality scores.</h2>
+						</div>
+						<p>Shown when Cronometer returns nutrition score categories.</p>
+					</div>
+					<div class="kpi-grid">${cronometerScores.map(renderKpiCard).join("")}</div>
+				</section>`
+				: ""
+		}
+		<section class="section">
+			<div class="section-head">
+				<div>
 					<span class="eyebrow">Timeline</span>
 					<h2>My day so far.</h2>
 				</div>
-				<p>Completed message slots appear here after the scheduler sends them. Pending slots are due today but have not been marked sent yet.</p>
+				<p>Completed message slots appear here after the scheduler sends them. New sends show the generated summary instead of the original question.</p>
 			</div>
+			<form class="panel" method="GET">
+				<input type="hidden" name="timeline" value="1">
+				<div class="controls-grid">
+					<label class="check-card">
+						<input name="sent" type="checkbox" value="1" ${timelineOptions.includeSentMessages ? "checked" : ""}>
+						<span>Include sent messages<small>Show Telegram messages and pending scheduled slots.</small></span>
+					</label>
+					<label class="check-card">
+						<input name="yesterday" type="checkbox" value="1" ${timelineOptions.includeYesterdaySummary ? "checked" : ""}>
+						<span>Include yesterday summary<small>Show a basic previous-day nutrition checkpoint.</small></span>
+					</label>
+					<label class="check-card">
+						<input name="events" type="checkbox" value="1" ${timelineOptions.includeEventTimeline ? "checked" : ""}>
+						<span>Include event timeline<small>Wake-up, meals, snack, workout, and dinner checkpoints.</small></span>
+					</label>
+				</div>
+				<div class="actions"><button type="submit">Update timeline</button></div>
+			</form>
 			<div class="panel">
 				<div class="timeline">
 					${timeline.map(renderTimelineItem).join("")}
@@ -2648,6 +3160,44 @@ utilityRoutes.post("/api/data-preferences", async (c) => {
 	} catch (error) {
 		console.error("Data preference save failed:", error);
 		return c.json({ error: "Could not save data routing." }, 500);
+	}
+});
+
+function clampedNumber(
+	value: unknown,
+	fallback: number,
+	min: number,
+	max: number,
+): number {
+	const parsed = typeof value === "string" ? Number(value) : numberFrom(value);
+	if (parsed === undefined || !Number.isFinite(parsed)) return fallback;
+	return Math.max(min, Math.min(max, parsed));
+}
+
+utilityRoutes.post("/api/score-preferences", async (c) => {
+	const session = await getSettingsSession(c);
+	if (!session) return c.json({ error: "Unauthorized" }, 401);
+	try {
+		const body = await c.req.json();
+		await upsertScorePreferences(c.env, session, {
+			nutritionWeight: Math.round(
+				clampedNumber(body.nutritionWeight, 35, 0, 100),
+			),
+			readinessWeight: Math.round(
+				clampedNumber(body.readinessWeight, 35, 0, 100),
+			),
+			fitnessWeight: Math.round(clampedNumber(body.fitnessWeight, 30, 0, 100)),
+			proteinTargetG: Math.round(
+				clampedNumber(body.proteinTargetG, 100, 0, 400),
+			),
+			sugarLimitG: Math.round(clampedNumber(body.sugarLimitG, 25, 0, 300)),
+			fiberTargetG: Math.round(clampedNumber(body.fiberTargetG, 25, 0, 120)),
+			sleepTargetHours: clampedNumber(body.sleepTargetHours, 7, 3, 12),
+		});
+		return c.json({ success: true });
+	} catch (error) {
+		console.error("Score preference save failed:", error);
+		return c.json({ error: "Could not save score formula." }, 500);
 	}
 });
 
